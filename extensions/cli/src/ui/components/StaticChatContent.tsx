@@ -69,13 +69,20 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
     }
   }, [refreshTrigger, refreshStatic]);
 
-  // Create static items array (reverted to simpler approach)
-  const staticItems = React.useMemo(() => {
-    const items: React.ReactElement[] = [];
+  // Filter out system messages without content
+  const filteredChatHistory = React.useMemo(() => {
+    return chatHistory.filter(
+      (item) => item.message.role !== "system" || item.message.content,
+    );
+  }, [chatHistory]);
 
+  // Split chat history into stable and pending items
+  // The last two items may have pending tool calls
+  const { staticItems, pendingItems } = React.useMemo(() => {
     // Add intro message as first item if it should be shown
+    const staticItems: React.ReactElement[] = [];
     if (showIntroMessage) {
-      items.push(
+      staticItems.push(
         <IntroMessage
           key="intro"
           config={config}
@@ -85,19 +92,40 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
       );
     }
 
-    // Add all chat messages (filter out system messages)
-    chatHistory
-      .filter((item) => item.message.role !== "system" || item.message.content) // Keep non-empty system messages
-      .forEach((item, index) => {
-        items.push(renderMessage(item, index));
-      });
+    const PENDING_ITEMS_COUNT = 2;
+    const stableCount = Math.max(
+      0,
+      filteredChatHistory.length - PENDING_ITEMS_COUNT,
+    );
+    const stableHistory = filteredChatHistory.slice(0, stableCount);
+    const pendingHistory = filteredChatHistory.slice(stableCount);
 
-    return items;
-  }, [showIntroMessage, config, model, mcpService, chatHistory, renderMessage]);
+    // Add stable messages to static items
+    stableHistory.forEach((item, index) => {
+      staticItems.push(renderMessage(item, index));
+    });
+
+    // Pending items will be rendered dynamically outside Static
+    const pendingItems = pendingHistory.map((item, index) =>
+      renderMessage(item, stableCount + index),
+    );
+
+    return {
+      staticItems,
+      pendingItems,
+    };
+  }, [
+    showIntroMessage,
+    config,
+    model,
+    mcpService,
+    filteredChatHistory,
+    renderMessage,
+  ]);
 
   return (
     <Box flexDirection="column">
-      {/* Static content - all messages in one Static component */}
+      {/* Static content - items that won't change */}
       <Static
         key={staticKey}
         items={staticItems}
@@ -108,6 +136,13 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
       >
         {(item) => item}
       </Static>
+
+      {/* Pending area - dynamically rendered items that can update */}
+      <Box flexDirection="column">
+        {pendingItems.map((item, index) => (
+          <React.Fragment key={`pending-${index}`}>{item}</React.Fragment>
+        ))}
+      </Box>
 
       {/* Queued messages - show at bottom with queue indicators */}
       {queuedMessages.length > 0 && (
