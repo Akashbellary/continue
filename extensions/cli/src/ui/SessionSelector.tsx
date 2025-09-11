@@ -46,7 +46,7 @@ export function SessionSelector({
   const displaySessions = useMemo(() => {
     // Reserve lines for UI components:
     // - 3 lines for header (title + instructions + spacer)
-    // - 2 lines for box borders (top + bottom) 
+    // - 2 lines for box borders (top + bottom)
     // - 2 lines for padding/margins
     // - 2 lines for status bar (when used with /resume command)
     // - Each session takes 3 lines (title + timestamp + spacer)
@@ -57,7 +57,7 @@ export function SessionSelector({
 
     // Further limit to ensure we never exceed screen bounds
     const safeLimitedSessions = Math.min(maxDisplayableSessions, sessions.length);
-    
+
     return sessions.slice(0, safeLimitedSessions);
   }, [sessions, terminalHeight]);
 
