@@ -14,7 +14,13 @@ import {
 
 import { breakTextIntoRows } from "./useChat.splitLines.helpers.js";
 
-// Extended type for split messages - tracks when long messages are broken into multiple rows
+/**
+ * Extended chat item type that supports anti-flickering row-based rendering
+ * 
+ * splitMessage: Tracks position when long messages are split across rows
+ * styledSegments: Pre-computed text+styling, eliminates markdown processing in MemoizedMessage
+ * toolResultRow: Single tool result row with pre-styled segments, replaces nested components
+ */
 export type ChatHistoryItemWithSplit = ChatHistoryItem & {
   splitMessage?: {
     isFirstRow: boolean;
@@ -22,9 +28,7 @@ export type ChatHistoryItemWithSplit = ChatHistoryItem & {
     totalRows: number;
     rowIndex: number;
   };
-  // Pre-processed styled segments for this row - when present, these should be used instead of processing markdown
   styledSegments?: StyledSegment[];
-  // For tool result rows - when present, this represents a single row from a tool result
   toolResultRow?: {
     toolCallId: string;
     toolName: string;
@@ -35,9 +39,16 @@ export type ChatHistoryItemWithSplit = ChatHistoryItem & {
 };
 
 /**
- * Split message content into multiple ChatHistoryItems based on terminal width
- * Now processes markdown into styled segments first, then splits those segments across rows
- * This prevents markdown re-processing and flickering
+ * CORE TEXT SPLITTING: Convert large messages into terminal-width rows with styled segments
+ * 
+ * Anti-flickering text processing:
+ * 1. Process markdown content into styled segments (text + color/formatting)
+ * 2. Split segments across rows that fit the terminal width
+ * 3. Create separate ChatHistoryItem for each row with pre-computed styledSegments
+ * 4. MemoizedMessage renders single rows instantly without markdown processing
+ * 
+ * Word wrapping preserves markdown formatting while ensuring each row fits the terminal.
+ * Multiple styling within one row is supported through segment arrays.
  */
 export function splitMessageContent(
   content: MessageContent,

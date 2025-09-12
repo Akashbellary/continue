@@ -262,6 +262,9 @@ export async function formatMessageWithFiles(
   );
 }
 
+/**
+ * Helper: Split assistant message content into terminal-width rows with styled segments
+ */
 function processAssistantMessageContent(
   item: ChatHistoryItem,
   terminalWidth: number,
@@ -284,6 +287,9 @@ function processAssistantMessageContent(
   }));
 }
 
+/**
+ * Helper: Create tool call header row with status indicator and pre-styled segments
+ */
 function createToolCallHeaderRow(
   item: ChatHistoryItem,
   toolState: any,
@@ -327,6 +333,9 @@ function createToolCallHeaderRow(
   } as ChatHistoryItemWithSplit;
 }
 
+/**
+ * Helper: Process tool output into multiple pre-styled rows
+ */
 function processToolCallOutput(
   item: ChatHistoryItem,
   toolState: any,
@@ -387,6 +396,10 @@ function processToolCallOutput(
   } as ChatHistoryItemWithSplit));
 }
 
+/**
+ * Helper: Process assistant messages that contain tool calls
+ * Separates message content from tool results to prevent UI flickering
+ */
 function processAssistantWithToolCalls(
   item: ChatHistoryItem,
   terminalWidth: number,
@@ -414,8 +427,16 @@ function processAssistantWithToolCalls(
 }
 
 /**
- * Process chat history to apply message splitting to assistant messages and expand tool calls
- * This ensures all messages are properly split for terminal display and tool results are expanded into individual rows
+ * CORE ARCHITECTURE: Pre-process all chat content into terminal-width rows
+ * 
+ * Anti-flickering strategy that processes all text and tool results upstream:
+ * 1. Split all content into terminal-width-sized rows
+ * 2. Pre-process markdown into styled segments with text/color formatting
+ * 3. Expand tool calls into individual result rows with pre-styled segments
+ * 4. Pass down small, pre-styled pieces that render instantly
+ * 
+ * Each MemoizedMessage receives pre-computed segments, eliminating markdown
+ * processing and preventing recomputation during terminal resizing.
  */
 export function processHistoryForTerminalDisplay(
   history: ChatHistoryItem[],

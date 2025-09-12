@@ -71,6 +71,9 @@ interface ToolResultSummaryProps {
   content: string;
 }
 
+/**
+ * Helper: Process checklist content into header + checkbox rows with status styling
+ */
 function processChecklistRows(content: string): ToolResultRow[] {
   const rows: ToolResultRow[] = [
     {
@@ -125,6 +128,9 @@ function processChecklistRows(content: string): ToolResultRow[] {
   return rows;
 }
 
+/**
+ * Helper: Process Write/Edit/MultiEdit results into success message + diff rows
+ */
 function processFileEditRows(toolName: string | undefined, content: string): ToolResultRow[] | null {
   if (!(toolName === "Write" || toolName === "Edit" || toolName === "MultiEdit") || !content.includes("Diff:\n")) {
     return null;
@@ -159,6 +165,9 @@ function processFileEditRows(toolName: string | undefined, content: string): Too
   return rows;
 }
 
+/**
+ * Helper: Process bash output into header + terminal output rows with truncation
+ */
 function processBashOutputRows(content: string): ToolResultRow[] {
   const isStderr = content.startsWith("Stderr:");
   const actualOutput = isStderr ? content.slice(7).trim() : content;
@@ -217,8 +226,19 @@ function processBashOutputRows(content: string): ToolResultRow[] {
 }
 
 /**
- * Process tool results into individual rows with pre-styled segments
- * This replaces the old ToolResultSummary single-component approach
+ * TOOL RESULT SEGMENTATION: Convert complex tool outputs into pre-styled rows
+ * 
+ * Processes tool outputs upstream to prevent flickering:
+ * 1. Convert tool outputs into individual rows with pre-computed styled segments
+ * 2. Handle multi-row outputs (checklists, diffs, bash output) at this level
+ * 3. Return ToolResultRow objects that become separate MemoizedMessage components
+ * 4. Each row renders instantly with pre-styled segments
+ * 
+ * Complex tool result types that create multiple rows:
+ * - Checklist: Header + checkbox rows with status indicators and strikethrough
+ * - Write/Edit diffs: Success message + diff lines with +/- styling and colors
+ * - Bash output: Header + terminal output lines (truncated if exceeds limit)
+ * - Other tools: Summary row with formatted content and path conversion
  */
 export function processToolResultIntoRows({
   toolName,
