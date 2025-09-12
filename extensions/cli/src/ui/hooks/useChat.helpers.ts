@@ -15,15 +15,15 @@ import { loadSession, startNewSession } from "../../session.js";
 import { posthogService } from "../../telemetry/posthogService.js";
 import { telemetryService } from "../../telemetry/telemetryService.js";
 import {
-  splitMessageContent,
-  type ChatHistoryItemWithSplit,
-} from "./useChat.splitMessage.helpers.js";
-import {
   processToolResultIntoRows,
   getToolCallTitleSegments,
 } from "../ToolResultProcessor.js";
 
 import { processImagePlaceholder } from "./useChat.imageProcessing.js";
+import {
+  splitMessageContent,
+  type ChatHistoryItemWithSplit,
+} from "./useChat.splitMessage.helpers.js";
 import { SlashCommandResult } from "./useChat.types.js";
 
 /**
@@ -262,6 +262,157 @@ export async function formatMessageWithFiles(
   );
 }
 
+function processAssistantMessageContent(
+  item: ChatHistoryItem,
+  terminalWidth: number,
+): ChatHistoryItem[] {
+  if (!item.message.content) {
+    return [];
+  }
+
+  const splitMessages = splitMessageContent(
+    item.message.content,
+    "assistant",
+    item.contextItems || [],
+    terminalWidth,
+  );
+  
+  return splitMessages.map((splitMsg) => ({
+    ...item,
+    ...splitMsg,
+    toolCallStates: undefined, // Remove tool calls from content rows
+  }));
+}
+
+function createToolCallHeaderRow(
+  item: ChatHistoryItem,
+  toolState: any,
+): ChatHistoryItemWithSplit {
+  const toolName = toolState.toolCall.function.name;
+  const toolArgs = toolState.parsedArgs;
+  const isCompleted = toolState.status === "done";
+  const isErrored = toolState.status === "errored" || toolState.status === "canceled";
+
+  return {
+    message: {
+      role: "assistant",
+      content: "",
+    },
+    contextItems: item.contextItems,
+    toolResultRow: {
+      toolCallId: toolState.toolCallId,
+      toolName,
+      rowData: {
+        type: "header",
+        segments: [
+          {
+            text: isCompleted || isErrored ? "●" : "○",
+            styling: {
+              color: isErrored
+                ? "red"
+                : isCompleted
+                  ? "green"
+                  : toolState.status === "generated"
+                    ? "yellow"
+                    : "white",
+            },
+          },
+          { text: " ", styling: {} },
+          ...getToolCallTitleSegments(toolName, toolArgs),
+        ],
+      },
+      isFirstToolRow: true,
+      isLastToolRow: !toolState.output || toolState.output.length === 0,
+    },
+  } as ChatHistoryItemWithSplit;
+}
+
+function processToolCallOutput(
+  item: ChatHistoryItem,
+  toolState: any,
+): ChatHistoryItem[] {
+  if (!toolState.output || toolState.output.length === 0) {
+    return [];
+  }
+
+  const toolName = toolState.toolCall.function.name;
+  const isErrored = toolState.status === "errored" || toolState.status === "canceled";
+
+  if (isErrored) {
+    return [{
+      message: {
+        role: "assistant",
+        content: "",
+      },
+      contextItems: item.contextItems,
+      toolResultRow: {
+        toolCallId: toolState.toolCallId,
+        toolName,
+        rowData: {
+          type: "content",
+          segments: [
+            { text: "  ", styling: {} }, // Indentation
+            {
+              text: toolState.output[0].content ?? "Tool execution failed",
+              styling: { color: "red" },
+            },
+          ],
+        },
+        isFirstToolRow: false,
+        isLastToolRow: true,
+      },
+    } as ChatHistoryItemWithSplit];
+  }
+
+  // Process tool output into multiple rows
+  const content = toolState.output.map((o: any) => o.content).join("\n");
+  const toolResultRows = processToolResultIntoRows({
+    toolName,
+    content,
+  });
+
+  return toolResultRows.map((rowData, rowIndex) => ({
+    message: {
+      role: "assistant",
+      content: "",
+    },
+    contextItems: item.contextItems,
+    toolResultRow: {
+      toolCallId: toolState.toolCallId,
+      toolName,
+      rowData,
+      isFirstToolRow: false,
+      isLastToolRow: rowIndex === toolResultRows.length - 1,
+    },
+  } as ChatHistoryItemWithSplit));
+}
+
+function processAssistantWithToolCalls(
+  item: ChatHistoryItem,
+  terminalWidth: number,
+): ChatHistoryItem[] {
+  const processedHistory: ChatHistoryItem[] = [];
+
+  // First, add the assistant message content if any (split if necessary)
+  const contentRows = processAssistantMessageContent(item, terminalWidth);
+  processedHistory.push(...contentRows);
+
+  // Then, process each tool call into individual rows
+  if (item.toolCallStates) {
+    for (const toolState of item.toolCallStates) {
+      // Create tool call header row
+      const headerRow = createToolCallHeaderRow(item, toolState);
+      processedHistory.push(headerRow);
+
+      // Process tool output if present
+      const outputRows = processToolCallOutput(item, toolState);
+      processedHistory.push(...outputRows);
+    }
+  }
+
+  return processedHistory;
+}
+
 /**
  * Process chat history to apply message splitting to assistant messages and expand tool calls
  * This ensures all messages are properly split for terminal display and tool results are expanded into individual rows
@@ -277,122 +428,8 @@ export function processHistoryForTerminalDisplay(
 
     if (item.message.role === "assistant" && !itemWithSplit.splitMessage) {
       if (item.toolCallStates && item.toolCallStates.length > 0) {
-        // Process tool calls: create individual rows for each part
-
-        // First, add the assistant message content if any (split if necessary)
-        if (item.message.content) {
-          const splitMessages = splitMessageContent(
-            item.message.content,
-            "assistant",
-            item.contextItems || [],
-            terminalWidth,
-          );
-          const splitMessagesWithProps = splitMessages.map((splitMsg) => ({
-            ...item,
-            ...splitMsg,
-            toolCallStates: undefined, // Remove tool calls from content rows
-          }));
-          processedHistory.push(...splitMessagesWithProps);
-        }
-
-        // Then, process each tool call into individual rows
-        for (const toolState of item.toolCallStates) {
-          const toolName = toolState.toolCall.function.name;
-          const toolArgs = toolState.parsedArgs;
-          const isCompleted = toolState.status === "done";
-          const isErrored =
-            toolState.status === "errored" || toolState.status === "canceled";
-
-          // Create tool call header row
-          processedHistory.push({
-            message: {
-              role: "assistant",
-              content: "",
-            },
-            contextItems: item.contextItems,
-            toolResultRow: {
-              toolCallId: toolState.toolCallId,
-              toolName,
-              rowData: {
-                type: "header",
-                segments: [
-                  {
-                    text: isCompleted || isErrored ? "●" : "○",
-                    styling: {
-                      color: isErrored
-                        ? "red"
-                        : isCompleted
-                          ? "green"
-                          : toolState.status === "generated"
-                            ? "yellow"
-                            : "white",
-                    },
-                  },
-                  { text: " ", styling: {} },
-                  ...getToolCallTitleSegments(toolName, toolArgs),
-                ],
-              },
-              isFirstToolRow: true,
-              isLastToolRow: !toolState.output || toolState.output.length === 0,
-            },
-          } as ChatHistoryItemWithSplit);
-
-          // Process tool output if present
-          if (toolState.output && toolState.output.length > 0) {
-            if (isErrored) {
-              // Single error row
-              processedHistory.push({
-                message: {
-                  role: "assistant",
-                  content: "",
-                },
-                contextItems: item.contextItems,
-                toolResultRow: {
-                  toolCallId: toolState.toolCallId,
-                  toolName,
-                  rowData: {
-                    type: "content",
-                    segments: [
-                      { text: "  ", styling: {} }, // Indentation
-                      {
-                        text:
-                          toolState.output[0].content ??
-                          "Tool execution failed",
-                        styling: { color: "red" },
-                      },
-                    ],
-                  },
-                  isFirstToolRow: false,
-                  isLastToolRow: true,
-                },
-              } as ChatHistoryItemWithSplit);
-            } else {
-              // Process tool output into multiple rows
-              const content = toolState.output.map((o) => o.content).join("\n");
-              const toolResultRows = processToolResultIntoRows({
-                toolName,
-                content,
-              });
-
-              toolResultRows.forEach((rowData, rowIndex) => {
-                processedHistory.push({
-                  message: {
-                    role: "assistant",
-                    content: "",
-                  },
-                  contextItems: item.contextItems,
-                  toolResultRow: {
-                    toolCallId: toolState.toolCallId,
-                    toolName,
-                    rowData,
-                    isFirstToolRow: false,
-                    isLastToolRow: rowIndex === toolResultRows.length - 1,
-                  },
-                } as ChatHistoryItemWithSplit);
-              });
-            }
-          }
-        }
+        const toolCallRows = processAssistantWithToolCalls(item, terminalWidth);
+        processedHistory.push(...toolCallRows);
       } else {
         // Regular assistant messages without tool calls - split normally
         const splitMessages = splitMessageContent(

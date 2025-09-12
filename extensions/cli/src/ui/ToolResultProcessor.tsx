@@ -1,8 +1,10 @@
 import path from "path";
+
 import React from "react";
-import { Text, Box } from "ink";
-import { getToolDisplayName } from "src/tools/index.js";
+
 import { formatToolArgument } from "src/tools/formatters.js";
+import { getToolDisplayName } from "src/tools/index.js";
+
 import { StyledSegment } from "./MarkdownProcessor.js";
 
 const MAX_BASH_OUTPUT_LINES = 4;
@@ -69,6 +71,151 @@ interface ToolResultSummaryProps {
   content: string;
 }
 
+function processChecklistRows(content: string): ToolResultRow[] {
+  const rows: ToolResultRow[] = [
+    {
+      type: "header",
+      segments: [
+        { text: "⎿ ", styling: { color: "gray" } },
+        { text: "Task List Updated", styling: { color: "blue" } },
+      ],
+    },
+  ];
+
+  const lines = content.split("\n");
+  for (const line of lines) {
+    if (line.startsWith("Task list")) {
+      continue; // Skip header line
+    }
+
+    const checkboxMatch = line.match(/^(\s*)-\s*\[([ x])\]\s*(.*)$/);
+    if (checkboxMatch) {
+      const [, indent, status, taskText] = checkboxMatch;
+      const isCompleted = status === "x";
+
+      rows.push({
+        type: "content",
+        segments: [
+          { text: "  " + indent, styling: {} }, // Padding + indent
+          {
+            text: isCompleted ? "✓" : "○",
+            styling: { color: isCompleted ? "green" : "yellow" },
+          },
+          { text: " ", styling: {} },
+          {
+            text: taskText,
+            styling: {
+              color: isCompleted ? "gray" : "white",
+              strikethrough: isCompleted,
+            },
+          },
+        ],
+      });
+    } else if (line.trim()) {
+      rows.push({
+        type: "content",
+        segments: [
+          { text: "  ", styling: {} }, // Padding
+          { text: line, styling: { color: "white" } },
+        ],
+      });
+    }
+  }
+
+  return rows;
+}
+
+function processFileEditRows(toolName: string | undefined, content: string): ToolResultRow[] | null {
+  if (!(toolName === "Write" || toolName === "Edit" || toolName === "MultiEdit") || !content.includes("Diff:\n")) {
+    return null;
+  }
+
+  const diffSection = content.split("Diff:\n")[1];
+  if (!diffSection) {
+    return null;
+  }
+
+  const rows: ToolResultRow[] = [
+    {
+      type: "header",
+      segments: [
+        { text: "⎿ ", styling: { color: "gray" } },
+        {
+          text:
+            toolName === "Edit"
+              ? " File edited successfully"
+              : toolName === "MultiEdit"
+                ? " File edited successfully"
+                : " File written successfully",
+          styling: { color: "green" },
+        },
+      ],
+    },
+  ];
+
+  const diffRows = processDiffIntoRows(diffSection);
+  rows.push(...diffRows);
+
+  return rows;
+}
+
+function processBashOutputRows(content: string): ToolResultRow[] {
+  const isStderr = content.startsWith("Stderr:");
+  const actualOutput = isStderr ? content.slice(7).trim() : content;
+  const outputLines = actualOutput.split("\n");
+
+  const rows: ToolResultRow[] = [
+    {
+      type: "header",
+      segments: [
+        { text: "⎿ ", styling: { color: "gray" } },
+        { text: " Terminal output:", styling: { color: "gray" } },
+      ],
+    },
+  ];
+
+  if (outputLines.length <= MAX_BASH_OUTPUT_LINES) {
+    // Show actual output for MAX_BASH_OUTPUT_LINES lines or fewer
+    for (const line of outputLines) {
+      if (line.trim()) {
+        rows.push({
+          type: "content",
+          segments: [
+            { text: "  ", styling: {} }, // Padding
+            { text: line, styling: { color: isStderr ? "red" : "white" } },
+          ],
+        });
+      }
+    }
+  } else {
+    // Show first MAX_BASH_OUTPUT_LINES lines with ellipsis for more lines
+    const firstLines = outputLines.slice(0, MAX_BASH_OUTPUT_LINES);
+    for (const line of firstLines) {
+      if (line.trim()) {
+        rows.push({
+          type: "content",
+          segments: [
+            { text: "  ", styling: {} }, // Padding
+            { text: line, styling: { color: isStderr ? "red" : "white" } },
+          ],
+        });
+      }
+    }
+    rows.push({
+      type: "content",
+      segments: [
+        { text: "  ", styling: {} }, // Padding
+        {
+          text: `... +${outputLines.length - MAX_BASH_OUTPUT_LINES} lines`,
+          styling: { color: "gray" },
+        },
+      ],
+    });
+  }
+
+  return rows;
+}
+
 /**
  * Process tool results into individual rows with pre-styled segments
  * This replaces the old ToolResultSummary single-component approach
@@ -93,149 +240,18 @@ export function processToolResultIntoRows({
 
   // Handle Checklist specially with styled display
   if (toolName === "Checklist") {
-    const rows: ToolResultRow[] = [
-      {
-        type: "header",
-        segments: [
-          { text: "⎿ ", styling: { color: "gray" } },
-          { text: "Task List Updated", styling: { color: "blue" } },
-        ],
-      },
-    ];
-
-    // Process checklist content line by line
-    const lines = content.split("\n");
-    for (const line of lines) {
-      if (line.startsWith("Task list")) {
-        continue; // Skip header line
-      }
-
-      const checkboxMatch = line.match(/^(\s*)-\s*\[([ x])\]\s*(.*)$/);
-      if (checkboxMatch) {
-        const [, indent, status, taskText] = checkboxMatch;
-        const isCompleted = status === "x";
-
-        rows.push({
-          type: "content",
-          segments: [
-            { text: "  " + indent, styling: {} }, // Padding + indent
-            {
-              text: isCompleted ? "✓" : "○",
-              styling: { color: isCompleted ? "green" : "yellow" },
-            },
-            { text: " ", styling: {} },
-            {
-              text: taskText,
-              styling: {
-                color: isCompleted ? "gray" : "white",
-                strikethrough: isCompleted,
-              },
-            },
-          ],
-        });
-      } else if (line.trim()) {
-        rows.push({
-          type: "content",
-          segments: [
-            { text: "  ", styling: {} }, // Padding
-            { text: line, styling: { color: "white" } },
-          ],
-        });
-      }
-    }
-
-    return rows;
+    return processChecklistRows(content);
   }
 
   // Handle Write/Edit/MultiEdit with diff specially
-  if (
-    (toolName === "Write" || toolName === "Edit" || toolName === "MultiEdit") &&
-    content.includes("Diff:\n")
-  ) {
-    const diffSection = content.split("Diff:\n")[1];
-    if (diffSection) {
-      const rows: ToolResultRow[] = [
-        {
-          type: "header",
-          segments: [
-            { text: "⎿ ", styling: { color: "gray" } },
-            {
-              text:
-                toolName === "Edit"
-                  ? " File edited successfully"
-                  : toolName === "MultiEdit"
-                    ? " File edited successfully"
-                    : " File written successfully",
-              styling: { color: "green" },
-            },
-          ],
-        },
-      ];
-
-      // Process diff into individual rows (no more ColoredDiff component)
-      const diffRows = processDiffIntoRows(diffSection);
-      rows.push(...diffRows);
-
-      return rows;
-    }
+  const fileEditRows = processFileEditRows(toolName, content);
+  if (fileEditRows) {
+    return fileEditRows;
   }
 
   // Handle terminal command output specially
   if (toolName === "Bash") {
-    const isStderr = content.startsWith("Stderr:");
-    const actualOutput = isStderr ? content.slice(7).trim() : content;
-    const outputLines = actualOutput.split("\n");
-
-    const rows: ToolResultRow[] = [
-      {
-        type: "header",
-        segments: [
-          { text: "⎿ ", styling: { color: "gray" } },
-          { text: " Terminal output:", styling: { color: "gray" } },
-        ],
-      },
-    ];
-
-    if (outputLines.length <= MAX_BASH_OUTPUT_LINES) {
-      // Show actual output for MAX_BASH_OUTPUT_LINES lines or fewer
-      for (const line of outputLines) {
-        if (line.trim()) {
-          rows.push({
-            type: "content",
-            segments: [
-              { text: "  ", styling: {} }, // Padding
-              { text: line, styling: { color: isStderr ? "red" : "white" } },
-            ],
-          });
-        }
-      }
-    } else {
-      // Show first MAX_BASH_OUTPUT_LINES lines with ellipsis for more lines
-      const firstLines = outputLines.slice(0, MAX_BASH_OUTPUT_LINES);
-      for (const line of firstLines) {
-        if (line.trim()) {
-          rows.push({
-            type: "content",
-            segments: [
-              { text: "  ", styling: {} }, // Padding
-              { text: line, styling: { color: isStderr ? "red" : "white" } },
-            ],
-          });
-        }
-      }
-      rows.push({
-        type: "content",
-        segments: [
-          { text: "  ", styling: {} }, // Padding
-          {
-            text: `... +${outputLines.length - MAX_BASH_OUTPUT_LINES} lines`,
-            styling: { color: "gray" },
-          },
-        ],
-      });
-    }
-
-    return rows;
+    return processBashOutputRows(content);
   }
 
   // Handle all other cases with text summary

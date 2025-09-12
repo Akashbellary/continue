@@ -5,8 +5,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatHistoryItem } from "../../../../../core/index.js";
 import type { MCPService } from "../../services/MCPService.js";
 import type { QueuedMessage } from "../../stream/messageQueue.js";
-import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { processHistoryForTerminalDisplay } from "../hooks/useChat.helpers.js";
+import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { IntroMessage } from "../IntroMessage.js";
 
 interface StaticChatContentProps {

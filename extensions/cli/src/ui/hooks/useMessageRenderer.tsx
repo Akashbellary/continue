@@ -2,6 +2,7 @@ import React, { useCallback } from "react";
 
 import type { ChatHistoryItem } from "../../../../../core/index.js";
 import { MemoizedMessage } from "../components/MemoizedMessage.js";
+
 import { type ChatHistoryItemWithSplit } from "./useChat.splitMessage.helpers.js";
 
 export function useMessageRenderer() {

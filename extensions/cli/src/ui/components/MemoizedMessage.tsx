@@ -49,7 +49,6 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
   ({ item, index }) => {
     const {
       message,
-      toolCallStates,
       conversationSummary,
       splitMessage,
       styledSegments,
