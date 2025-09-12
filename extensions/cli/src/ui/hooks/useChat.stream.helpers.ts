@@ -7,14 +7,12 @@ import { services } from "../../services/index.js";
 import { getCurrentSession, updateSessionTitle } from "../../session.js";
 
 import { generateSessionTitle } from "./useChat.helpers.js";
-import { splitMessageContent } from "./useChat.splitMessage.helpers.js";
 
 interface CreateStreamCallbacksOptions {
   setChatHistory: React.Dispatch<React.SetStateAction<ChatHistoryItem[]>>;
   setActivePermissionRequest: React.Dispatch<React.SetStateAction<any>>;
   llmApi?: any;
   model?: any;
-  terminalWidth: number;
 }
 
 /**
@@ -28,7 +26,6 @@ export function createStreamCallbacks(
     setActivePermissionRequest,
     llmApi,
     model,
-    terminalWidth,
   } = options;
 
   return {
@@ -41,15 +38,16 @@ export function createStreamCallbacks(
         const svc = services.chatHistory;
         const useService = typeof svc?.isReady === "function" && svc.isReady();
         if (!useService && content) {
-          // Split the assistant message content based on terminal width
-          const splitMessages = splitMessageContent(
-            content,
-            "assistant",
-            [],
-            terminalWidth,
-          );
+          // Add the assistant message - processing will happen upstream in TUIChat
+          const assistantMessage: ChatHistoryItem = {
+            message: {
+              role: "assistant",
+              content,
+            },
+            contextItems: [],
+          };
 
-          setChatHistory((prev) => [...prev, ...splitMessages]);
+          setChatHistory((prev) => [...prev, assistantMessage]);
         }
       } catch (error) {
         logger.error("Failed to update chat history", { error });

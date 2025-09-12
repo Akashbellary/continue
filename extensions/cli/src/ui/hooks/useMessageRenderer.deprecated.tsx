@@ -1,9 +1,19 @@
+/**
+ * DEPRECATED: This hook has been replaced by the MessageRow processing architecture
+ * 
+ * Replaced by processHistoryToMessageRows() which processes all messages upstream
+ * into MessageRow[] that can be rendered directly with MessageRowComponent.
+ * 
+ * The new approach eliminates the need for a renderMessage function and complex
+ * key generation, providing consistent rendering with pre-styled segments.
+ */
+
 import React, { useCallback } from "react";
 
 import type { ChatHistoryItem } from "../../../../../core/index.js";
-import { MemoizedMessage } from "../components/MemoizedMessage.js";
+import { MemoizedMessage } from "../components/MemoizedMessage.deprecated.js";
 
-import { type ChatHistoryItemWithSplit } from "./useChat.splitMessage.helpers.js";
+type ChatHistoryItemWithSplit = any; // Placeholder for deprecated component
 
 export function useMessageRenderer() {
   const renderMessage = useCallback((item: ChatHistoryItem, index: number) => {

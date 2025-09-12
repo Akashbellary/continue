@@ -1,8 +1,21 @@
+/**
+ * DEPRECATED: This component has been replaced by MessageRowComponent
+ * 
+ * Replaced by the unified MessageRow architecture which processes all messages
+ * upstream into pre-styled segments, eliminating conditional rendering logic
+ * and preventing flickering during terminal resizing.
+ * 
+ * New architecture:
+ * - ChatHistoryItem[] → processHistoryToMessageRows() → MessageRow[]
+ * - MessageRowComponent renders each MessageRow with consistent segments
+ * - No more complex conditional logic or processing in components
+ */
+
 import { Box, Text } from "ink";
 import React, { memo } from "react";
 
 import { MessageContent } from "../../../../../core/index.js";
-import { ChatHistoryItemWithSplit } from "../hooks/useChat.splitMessage.helpers.js";
+type ChatHistoryItemWithSplit = any; // Placeholder for deprecated component
 import {
   StyledSegmentRenderer,
   processMarkdownToSegments,

@@ -25,7 +25,6 @@ import { StaticChatContent } from "./components/StaticChatContent.js";
 import { useNavigation } from "./context/NavigationContext.js";
 import { useChat } from "./hooks/useChat.js";
 import { useContextPercentage } from "./hooks/useContextPercentage.js";
-import { useMessageRenderer } from "./hooks/useMessageRenderer.js";
 import { useTerminalSize } from "./hooks/useTerminalSize.js";
 import {
   useCurrentMode,
@@ -33,6 +32,7 @@ import {
   useLoginHandlers,
   useSelectors,
 } from "./hooks/useTUIChatHooks.js";
+import { processHistoryToMessageRows } from "./processors/messageProcessor.js";
 
 interface TUIChatProps {
   // Remote mode props
@@ -234,7 +234,13 @@ const TUIChat: React.FC<TUIChatProps> = ({
     model: services.model?.model || undefined,
   });
 
-  const { renderMessage } = useMessageRenderer();
+  // Get terminal dimensions for processing
+  const { columns: terminalWidth } = useTerminalSize();
+
+  // Process chat history into MessageRow[] for unified rendering
+  const messageRows = useMemo(() => {
+    return processHistoryToMessageRows(chatHistory, terminalWidth);
+  }, [chatHistory, terminalWidth]);
 
   const { handleConfigSelect, handleModelSelect } = useSelectors(
     configPath,
@@ -288,9 +294,8 @@ const TUIChat: React.FC<TUIChatProps> = ({
           config={services.config?.config || undefined}
           model={services.model?.model || undefined}
           mcpService={services.mcp?.mcpService || undefined}
-          chatHistory={chatHistory}
+          messageRows={messageRows}
           queuedMessages={queuedMessages}
-          renderMessage={renderMessage}
           refreshTrigger={staticRefreshTrigger}
         />
       </Box>

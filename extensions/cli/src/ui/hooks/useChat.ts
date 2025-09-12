@@ -26,7 +26,6 @@ import {
   formatMessageWithFiles,
   handleSpecialCommands,
   initChatHistory,
-  processHistoryForTerminalDisplay,
   processSlashCommandResult,
   trackUserMessage,
 } from "./useChat.helpers.js";
@@ -121,17 +120,9 @@ export function useChat({
     svc
       .initialize(currentSession, isRemoteMode)
       .then(() => {
-        const processedHistory = processHistoryForTerminalDisplay(
-          svc.getHistory(),
-          terminalWidth,
-        );
-        setChatHistoryView(processedHistory);
+        setChatHistoryView(svc.getHistory());
         const listener = () => {
-          const processedHistory = processHistoryForTerminalDisplay(
-            svc.getHistory(),
-            terminalWidth,
-          );
-          setChatHistoryView(processedHistory);
+          setChatHistoryView(svc.getHistory());
         };
         svc.on("stateChanged", listener);
         serviceListenerCleanupRef.current = () =>
@@ -301,7 +292,6 @@ export function useChat({
         setActivePermissionRequest,
         llmApi,
         model,
-        terminalWidth,
       });
 
       // Execute streaming chat response

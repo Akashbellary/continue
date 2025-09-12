@@ -1,28 +1,28 @@
-## [1.4.2](https://github.com/continuedev/cli/compare/v1.4.1...v1.4.2) (2025-07-17)
+## [1.4.2](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMPARE/V1.4.1...V1.4.2) (2025-07-17)
 
-### Bug Fixes
+### BUG FIXES
 
-- remove warning ([31b3f67](https://github.com/continuedev/cli/commit/31b3f6707b0f42180c8ae56faf9dfb2f566be5c1))
+- REMOVE WARNING ([31B3F67](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMMIT/31B3F6707B0F42180C8AE56FAF9DFB2F566BE5C1))
 
-## [1.4.1](https://github.com/continuedev/cli/compare/v1.4.0...v1.4.1) (2025-07-17)
+## [1.4.1](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMPARE/V1.4.0...V1.4.1) (2025-07-17)
 
-### Bug Fixes
+### BUG FIXES
 
-- update readme ([0d45e14](https://github.com/continuedev/cli/commit/0d45e14b1be6557ace027cfeadfbf418061a28b0))
+- UPDATE README ([0D45E14](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMMIT/0D45E14B1BE6557ACE027CFEADFBF418061A28B0))
 
-# [1.4.0](https://github.com/continuedev/cli/compare/v1.3.6...v1.4.0) (2025-07-17)
+# [1.4.0](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMPARE/V1.3.6...V1.4.0) (2025-07-17)
 
-### Features
+### FEATURES
 
-- dim user msg text color ([b22429b](https://github.com/continuedev/cli/commit/b22429ba0a101f99b14313345a8a8894caff3081))
+- DIM USER MSG TEXT COLOR ([B22429B](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMMIT/B22429BA0A101F99B14313345A8A8894CAFF3081))
 
-## [1.3.6](https://github.com/continuedev/cli/compare/v1.3.5...v1.3.6) (2025-07-16)
+## [1.3.6](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMPARE/V1.3.5...V1.3.6) (2025-07-16)
 
-### Bug Fixes
+### BUG FIXES
 
-- update readme ([01329e4](https://github.com/continuedev/cli/commit/01329e4b4f66d97c93c98e0342f100792f626126))
+- UPDATE README ([01329E4](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMMIT/01329E4B4F66D97C93C98E0342F100792F626126))
 
-## [1.3.5](https://github.com/continuedev/cli/compare/v1.3.4...v1.3.5) (2025-07-16)
+## [1.3.5](HTTPS://GITHUB.COM/CONTINUEDEV/CLI/COMPARE/V1.3.4...V1.3.5) (2025-07-16)
 
 ### Bug Fixes
 

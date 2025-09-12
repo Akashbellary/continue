@@ -2,21 +2,21 @@ import type { AssistantUnrolled, ModelConfig } from "@continuedev/config-yaml";
 import { Box, Static, Text, useStdout } from "ink";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ChatHistoryItem } from "../../../../../core/index.js";
 import type { MCPService } from "../../services/MCPService.js";
 import type { QueuedMessage } from "../../stream/messageQueue.js";
-import { processHistoryForTerminalDisplay } from "../hooks/useChat.helpers.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { IntroMessage } from "../IntroMessage.js";
+import { MessageRow } from "../types/messageTypes.js";
+
+import { MessageRowComponent } from "./MessageRow.js";
 
 interface StaticChatContentProps {
   showIntroMessage: boolean;
   config?: AssistantUnrolled;
   model?: ModelConfig;
   mcpService?: MCPService;
-  chatHistory: ChatHistoryItem[];
+  messageRows: MessageRow[];
   queuedMessages?: QueuedMessage[];
-  renderMessage: (item: ChatHistoryItem, index: number) => React.ReactElement;
   refreshTrigger?: number; // Add a prop to trigger refresh from parent
 }
 
@@ -25,9 +25,8 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
   config,
   model,
   mcpService,
-  chatHistory,
+  messageRows,
   queuedMessages = [],
-  renderMessage,
   refreshTrigger,
 }) => {
   const { columns, rows } = useTerminalSize();
@@ -70,17 +69,17 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
     }
   }, [refreshTrigger, refreshStatic]);
 
-  // Filter out system messages without content and process for terminal display
-  const processedChatHistory = React.useMemo(() => {
-    const filtered = chatHistory.filter(
-      (item) => item.message.role !== "system" || item.message.content,
+  // Filter out empty system message rows (already processed by messageProcessor)
+  const visibleMessageRows = React.useMemo(() => {
+    return messageRows.filter(
+      (row) =>
+        row.role !== "system" ||
+        (row.segments.length > 0 && row.segments[0].text),
     );
-    // Process the history to expand tool calls into individual rows
-    return processHistoryForTerminalDisplay(filtered, columns);
-  }, [chatHistory, columns]);
+  }, [messageRows]);
 
-  // Split chat history into stable and pending items
-  // The last two items may have pending tool calls
+  // Split message rows into stable and pending items
+  // The last few rows may have pending tool calls
   const { staticItems, pendingItems } = React.useMemo(() => {
     // Add intro message as first item if it should be shown
     const staticItems: React.ReactElement[] = [];
@@ -95,36 +94,35 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
       );
     }
 
-    const PENDING_ITEMS_COUNT = 2;
+    const PENDING_ROWS_COUNT = 4; // Keep more rows pending for better streaming UX
     const stableCount = Math.max(
       0,
-      processedChatHistory.length - PENDING_ITEMS_COUNT,
+      visibleMessageRows.length - PENDING_ROWS_COUNT,
     );
-    const stableHistory = processedChatHistory.slice(0, stableCount);
-    const pendingHistory = processedChatHistory.slice(stableCount);
+    const stableRows = visibleMessageRows.slice(0, stableCount);
+    const pendingRows = visibleMessageRows.slice(stableCount);
 
-    // Add stable messages to static items
-    stableHistory.forEach((item, index) => {
-      staticItems.push(renderMessage(item, index));
+    // Add stable message rows to static items
+    stableRows.forEach((row, index) => {
+      staticItems.push(
+        <MessageRowComponent key={`stable-${index}`} row={row} index={index} />,
+      );
     });
 
-    // Pending items will be rendered dynamically outside Static
-    const pendingItems = pendingHistory.map((item, index) =>
-      renderMessage(item, stableCount + index),
-    );
+    // Pending rows will be rendered dynamically outside Static
+    const pendingItems = pendingRows.map((row, index) => (
+      <MessageRowComponent
+        key={`pending-${index}`}
+        row={row}
+        index={stableCount + index}
+      />
+    ));
 
     return {
       staticItems,
       pendingItems,
     };
-  }, [
-    showIntroMessage,
-    config,
-    model,
-    mcpService,
-    processedChatHistory,
-    renderMessage,
-  ]);
+  }, [showIntroMessage, config, model, mcpService, visibleMessageRows]);
 
   return (
     <Box flexDirection="column">

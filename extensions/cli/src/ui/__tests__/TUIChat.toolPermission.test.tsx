@@ -299,7 +299,7 @@ describe("TUIChat - Tool Permission Tests", () => {
     // Import the components we need for this test
     const { ToolResultSummary } = await import("../ToolResultSummary.deprecated.js");
     const { MemoizedMessage } = await import(
-      "../components/MemoizedMessage.js"
+      "../components/MemoizedMessage.deprecated.js"
     );
 
     // Test the ToolResultSummary component directly
