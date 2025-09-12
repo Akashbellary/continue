@@ -3,9 +3,9 @@ import React from "react";
 
 import { getToolDisplayName } from "../../tools/index.js";
 import { ToolCallPreview } from "../../tools/types.js";
-import { ColoredDiff } from "../ColoredDiff.deprecated.js";
 
-import { ChecklistDisplay } from "./ChecklistDisplay.deprecated.js";
+import { SimpleChecklistDisplay } from "./SimpleChecklistDisplay.js";
+import { SimpleColoredDiff } from "./SimpleColoredDiff.js";
 
 interface ToolPreviewProps {
   toolCallPreview?: ToolCallPreview[];
@@ -35,13 +35,13 @@ export const ToolPreview: React.FC<ToolPreviewProps> = ({
           } else if (preview.type === "checklist") {
             return (
               <Box key={index}>
-                <ChecklistDisplay
+                <SimpleChecklistDisplay
                   content={`Task list status:\n${preview.content}`}
                 />
               </Box>
             );
           } else {
-            return <ColoredDiff key={index} diffContent={preview.content} />;
+            return <SimpleColoredDiff key={index} diffContent={preview.content} />;
           }
         })}
       </Box>

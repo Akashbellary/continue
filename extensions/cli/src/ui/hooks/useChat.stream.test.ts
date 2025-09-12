@@ -18,7 +18,6 @@ describe("useChat streaming", () => {
     const callbacks = createStreamCallbacks({
       setChatHistory,
       setActivePermissionRequest: vi.fn(),
-      terminalWidth: 80,
     });
 
     // onContent is now empty and doesn't update history
@@ -55,7 +54,6 @@ describe("useChat streaming", () => {
     const callbacks = createStreamCallbacks({
       setChatHistory,
       setActivePermissionRequest: vi.fn(),
-      terminalWidth: 80,
     });
 
     // Start with some content
@@ -106,7 +104,6 @@ describe("useChat streaming", () => {
     const callbacks = createStreamCallbacks({
       setChatHistory,
       setActivePermissionRequest: vi.fn(),
-      terminalWidth: 80,
     });
 
     callbacks.onContent("Hi there");
@@ -132,7 +129,6 @@ describe("useChat streaming", () => {
     const callbacks = createStreamCallbacks({
       setChatHistory,
       setActivePermissionRequest: vi.fn(),
-      terminalWidth: 80,
     });
 
     // Add initial content
