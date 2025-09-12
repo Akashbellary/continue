@@ -491,7 +491,7 @@ export function useChat({
     if (isQueuedMessage) {
       // For queued messages, we need to format and add to history after compaction
       // First, format the message
-      const formattedQueuedMessage = await formatMessageWithFiles(
+      const formattedQueuedMessages = await formatMessageWithFiles(
         message,
         [], // No attached files for queued messages
         imageMap,
@@ -536,8 +536,8 @@ export function useChat({
         setCompactionAbortController(null);
       }
 
-      // Add the formatted queued message to history after compaction completes
-      const newHistory = [...currentChatHistory, formattedQueuedMessage];
+      // Add the formatted queued messages to history after compaction completes
+      const newHistory = [...currentChatHistory, ...formattedQueuedMessages];
       setChatHistory(newHistory);
 
       // Remove the queued message from display since it's now in chat history
@@ -553,7 +553,7 @@ export function useChat({
         hasImages: !!(imageMap && imageMap.size > 0),
         imageCount: imageMap?.size || 0,
       });
-      const newUserMessage = await formatMessageWithFiles(
+      const newUserMessages = await formatMessageWithFiles(
         message,
         attachedFiles,
         imageMap,
@@ -603,8 +603,8 @@ export function useChat({
         setCompactionAbortController(null);
       }
 
-      // Add the formatted user message to history
-      const newHistory = [...currentChatHistory, newUserMessage];
+      // Add the formatted user messages to history
+      const newHistory = [...currentChatHistory, ...newUserMessages];
       setChatHistory(newHistory);
 
       // Remove the triggering message from queue display since it's now in chat history

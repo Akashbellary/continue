@@ -4,16 +4,26 @@ import React, { memo } from "react";
 import { ToolCallTitle } from "src/tools/ToolCallTitle.js";
 
 import type { ChatHistoryItem } from "../../../../../core/index.js";
+import { MessageContent } from "../../../../../core/index.js";
 import { MarkdownRenderer } from "../MarkdownRenderer.js";
 import { ToolResultSummary } from "../ToolResultSummary.js";
+
+// Extended type for split messages - tracks when long messages are broken into multiple rows
+// to prevent text wrapping and enable cohesive visual grouping
+type ChatHistoryItemWithSplit = ChatHistoryItem & {
+  splitMessage?: {
+    isFirstRow: boolean;
+    isLastRow: boolean;
+    totalRows: number;
+    rowIndex: number;
+  };
+};
 
 /**
  * Formats message content for display, converting message parts array back to
  * user-friendly format with placeholders like [Image #1], [Pasted Text #1], etc.
  */
-function formatMessageContentForDisplay(
-  content: import("../../../../../core/index.js").MessageContent,
-): string {
+function formatMessageContentForDisplay(content: MessageContent): string {
   if (typeof content === "string") {
     return content;
   }
@@ -42,13 +52,13 @@ function formatMessageContentForDisplay(
 }
 
 interface MemoizedMessageProps {
-  item: ChatHistoryItem;
+  item: ChatHistoryItemWithSplit;
   index: number;
 }
 
 export const MemoizedMessage = memo<MemoizedMessageProps>(
   ({ item, index }) => {
-    const { message, toolCallStates, conversationSummary } = item;
+    const { message, toolCallStates, conversationSummary, splitMessage } = item;
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
     const isAssistant = message.role === "assistant";
@@ -164,9 +174,17 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
     // Handle regular messages
     const isStreaming = isAssistant && !message.content && !toolCallStates;
 
+    // For split messages: only show bullet on first row and remove
+    // spacing between rows so multiple rows appear as one message
+    const isSplitMessage = splitMessage !== undefined;
+    const shouldShowBullet = !isSplitMessage || splitMessage.isFirstRow;
+    const marginBottom = isSplitMessage && !splitMessage.isLastRow ? 0 : 1;
+
     return (
-      <Box key={index} marginBottom={1}>
-        <Text color={isUser ? "blue" : "white"}>●</Text>
+      <Box key={index} marginBottom={marginBottom}>
+        <Text color={isUser ? "blue" : "white"}>
+          {shouldShowBullet ? "●" : " "}
+        </Text>
         <Text> </Text>
         {isUser ? (
           <Text color="gray">
@@ -195,6 +213,8 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
       JSON.stringify(prevToolStates) === JSON.stringify(nextToolStates) &&
       prevProps.item.conversationSummary ===
         nextProps.item.conversationSummary &&
+      JSON.stringify(prevProps.item.splitMessage) ===
+        JSON.stringify(nextProps.item.splitMessage) &&
       prevProps.index === nextProps.index
     );
   },
