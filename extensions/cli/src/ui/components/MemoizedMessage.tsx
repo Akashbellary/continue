@@ -1,15 +1,12 @@
 import { Box, Text } from "ink";
 import React, { memo } from "react";
 
-import { ToolCallTitle } from "src/tools/ToolCallTitle.js";
-
 import { MessageContent } from "../../../../../core/index.js";
 import { ChatHistoryItemWithSplit } from "../hooks/useChat.helpers.js";
 import {
   StyledSegmentRenderer,
   processMarkdownToSegments,
 } from "../MarkdownProcessor.js";
-import { ToolResultSummary } from "../ToolResultSummary.js";
 
 /**
  * Formats message content for display, converting message parts array back to
@@ -56,6 +53,7 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
       conversationSummary,
       splitMessage,
       styledSegments,
+      toolResultRow,
     } = item;
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
@@ -94,95 +92,34 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
       );
     }
 
-    // Handle tool calls
-    if (toolCallStates && toolCallStates.length > 0) {
+    // Handle tool result rows (new architecture)
+    if (toolResultRow) {
+      const marginBottom = toolResultRow.isLastToolRow ? 1 : 0;
+
+      if (toolResultRow.rowData.component) {
+        // Render custom component (for complex components like ColoredDiff)
+        return (
+          <Box key={index} marginBottom={marginBottom}>
+            {toolResultRow.rowData.component}
+          </Box>
+        );
+      }
+
       return (
-        <Box key={index} flexDirection="column">
-          {/* Render assistant message content if any */}
-          {message.content && (
-            <Box marginBottom={1}>
-              <Text color="white">●</Text>
-              <Text> </Text>
-              <StyledSegmentRenderer
-                segments={
-                  styledSegments ||
-                  processMarkdownToSegments(
-                    formatMessageContentForDisplay(message.content),
-                  )
-                }
-              />
-            </Box>
-          )}
-
-          {/* Render tool calls */}
-          {toolCallStates.map((toolState) => {
-            const toolName = toolState.toolCall.function.name;
-            const toolArgs = toolState.parsedArgs;
-            const isCompleted = toolState.status === "done";
-            const isErrored =
-              toolState.status === "errored" || toolState.status === "canceled";
-
-            return (
-              <Box
-                key={toolState.toolCallId}
-                flexDirection="column"
-                marginBottom={1}
-              >
-                <Box>
-                  <Text
-                    color={
-                      isErrored
-                        ? "red"
-                        : isCompleted
-                          ? "green"
-                          : toolState.status === "generated"
-                            ? "yellow"
-                            : "white"
-                    }
-                  >
-                    {isCompleted || isErrored ? "●" : "○"}
-                  </Text>
-                  <Text color="white">
-                    {" "}
-                    <ToolCallTitle toolName={toolName} args={toolArgs} />
-                  </Text>
-                </Box>
-
-                {isErrored ? (
-                  <Box marginLeft={2}>
-                    <Text color="red">
-                      {toolState.output?.[0].content ?? "Tool execution failed"}
-                    </Text>
-                  </Box>
-                ) : (
-                  toolState.output &&
-                  toolState.output.length > 0 && (
-                    <Box marginLeft={2}>
-                      <ToolResultSummary
-                        toolName={toolName}
-                        content={toolState.output
-                          .map((o) => o.content)
-                          .join("\n")}
-                      />
-                    </Box>
-                  )
-                )}
-              </Box>
-            );
-          })}
+        <Box key={index} marginBottom={marginBottom}>
+          <StyledSegmentRenderer segments={toolResultRow.rowData.segments} />
         </Box>
       );
     }
 
     // Handle regular messages
-    // Never show streaming indicator for split messages or messages with pre-processed segments
-    // (they represent completed, processed content)
+    // Never show streaming indicator for split messages, tool result rows, or messages with pre-processed segments
     const isStreaming =
       isAssistant &&
       !message.content &&
-      !toolCallStates &&
       !splitMessage &&
-      !styledSegments;
+      !styledSegments &&
+      !toolResultRow;
 
     // For split messages: only show bullet on first row and remove
     // spacing between rows so multiple rows appear as one message
@@ -219,19 +156,18 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
     // Only re-render if these properties change
     const prevMessage = prevProps.item.message;
     const nextMessage = nextProps.item.message;
-    const prevToolStates = prevProps.item.toolCallStates;
-    const nextToolStates = nextProps.item.toolCallStates;
 
     return (
       prevMessage.content === nextMessage.content &&
       prevMessage.role === nextMessage.role &&
-      JSON.stringify(prevToolStates) === JSON.stringify(nextToolStates) &&
       prevProps.item.conversationSummary ===
         nextProps.item.conversationSummary &&
       JSON.stringify(prevProps.item.splitMessage) ===
         JSON.stringify(nextProps.item.splitMessage) &&
       JSON.stringify(prevProps.item.styledSegments) ===
         JSON.stringify(nextProps.item.styledSegments) &&
+      JSON.stringify(prevProps.item.toolResultRow) ===
+        JSON.stringify(nextProps.item.toolResultRow) &&
       prevProps.index === nextProps.index
     );
   },

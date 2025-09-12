@@ -16,6 +16,7 @@ export interface StyledSegment {
     italic?: boolean;
     strikethrough?: boolean;
     color?: string;
+    backgroundColor?: string; // For diff highlights and other background colors
     type?: "text" | "code" | "codeblock" | "heading" | "think";
     language?: string; // For code blocks
   };
@@ -236,6 +237,7 @@ export function renderStyledSegments(
         italic={segment.styling.italic}
         strikethrough={segment.styling.strikethrough}
         color={segment.styling.color}
+        backgroundColor={segment.styling.backgroundColor}
       >
         {segment.text}
       </Text>
