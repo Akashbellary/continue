@@ -6,7 +6,7 @@ import { logger } from "src/util/logger.js";
 import { services } from "../../services/index.js";
 import { getCurrentSession, updateSessionTitle } from "../../session.js";
 
-import { generateSessionTitle } from "./useChat.helpers.js";
+import { generateSessionTitle, splitMessageContent } from "./useChat.helpers.js";
 
 interface CreateStreamCallbacksOptions {
   setChatHistory: React.Dispatch<React.SetStateAction<ChatHistoryItem[]>>;
@@ -34,16 +34,17 @@ export function createStreamCallbacks(
         const svc = services.chatHistory;
         const useService = typeof svc?.isReady === "function" && svc.isReady();
         if (!useService && content) {
+          // Split the assistant message content based on terminal width
+          const splitMessages = splitMessageContent(
+            content,
+            "assistant",
+            [],
+            terminalWidth
+          );
+          
           setChatHistory((prev) => [
             ...prev,
-            {
-              contextItems: [],
-              message: {
-                role: "assistant",
-                content: content,
-                isStreaming: false,
-              },
-            },
+            ...splitMessages,
           ]);
         }
       } catch (error) {

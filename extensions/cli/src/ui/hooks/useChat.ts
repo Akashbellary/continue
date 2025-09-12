@@ -26,6 +26,7 @@ import {
   formatMessageWithFiles,
   handleSpecialCommands,
   initChatHistory,
+  processHistoryForTerminalDisplay,
   processSlashCommandResult,
   trackUserMessage,
 } from "./useChat.helpers.js";
@@ -120,9 +121,11 @@ export function useChat({
     svc
       .initialize(currentSession, isRemoteMode)
       .then(() => {
-        setChatHistoryView(svc.getHistory());
+        const processedHistory = processHistoryForTerminalDisplay(svc.getHistory(), terminalWidth);
+        setChatHistoryView(processedHistory);
         const listener = () => {
-          setChatHistoryView(svc.getHistory());
+          const processedHistory = processHistoryForTerminalDisplay(svc.getHistory(), terminalWidth);
+          setChatHistoryView(processedHistory);
         };
         svc.on("stateChanged", listener);
         serviceListenerCleanupRef.current = () =>

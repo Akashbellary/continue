@@ -5,19 +5,9 @@ import { ToolCallTitle } from "src/tools/ToolCallTitle.js";
 
 import type { ChatHistoryItem } from "../../../../../core/index.js";
 import { MessageContent } from "../../../../../core/index.js";
-import { MarkdownRenderer } from "../MarkdownRenderer.js";
 import { ToolResultSummary } from "../ToolResultSummary.js";
-
-// Extended type for split messages - tracks when long messages are broken into multiple rows
-// to prevent text wrapping and enable cohesive visual grouping
-type ChatHistoryItemWithSplit = ChatHistoryItem & {
-  splitMessage?: {
-    isFirstRow: boolean;
-    isLastRow: boolean;
-    totalRows: number;
-    rowIndex: number;
-  };
-};
+import { StyledSegment, StyledSegmentRenderer, processMarkdownToSegments } from "../MarkdownProcessor.js";
+import { ChatHistoryItemWithSplit } from "../hooks/useChat.helpers.js";
 
 /**
  * Formats message content for display, converting message parts array back to
@@ -58,7 +48,7 @@ interface MemoizedMessageProps {
 
 export const MemoizedMessage = memo<MemoizedMessageProps>(
   ({ item, index }) => {
-    const { message, toolCallStates, conversationSummary, splitMessage } = item;
+    const { message, toolCallStates, conversationSummary, splitMessage, styledSegments } = item;
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
     const isAssistant = message.role === "assistant";
@@ -105,8 +95,8 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
             <Box marginBottom={1}>
               <Text color="white">●</Text>
               <Text> </Text>
-              <MarkdownRenderer
-                content={formatMessageContentForDisplay(message.content)}
+              <StyledSegmentRenderer 
+                segments={styledSegments || processMarkdownToSegments(formatMessageContentForDisplay(message.content))} 
               />
             </Box>
           )}
@@ -191,8 +181,8 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
             {formatMessageContentForDisplay(message.content)}
           </Text>
         ) : (
-          <MarkdownRenderer
-            content={formatMessageContentForDisplay(message.content)}
+          <StyledSegmentRenderer 
+            segments={styledSegments || processMarkdownToSegments(formatMessageContentForDisplay(message.content))} 
           />
         )}
         {isStreaming && <Text color="gray">▋</Text>}
@@ -215,6 +205,8 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
         nextProps.item.conversationSummary &&
       JSON.stringify(prevProps.item.splitMessage) ===
         JSON.stringify(nextProps.item.splitMessage) &&
+      JSON.stringify(prevProps.item.styledSegments) ===
+        JSON.stringify(nextProps.item.styledSegments) &&
       prevProps.index === nextProps.index
     );
   },

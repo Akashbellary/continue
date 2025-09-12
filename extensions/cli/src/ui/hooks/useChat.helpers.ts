@@ -9,6 +9,7 @@ import { getLastNPathParts } from "core/util/uri.js";
 import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "src/util/logger.js";
+import { processMarkdownToSegments, splitStyledSegmentsIntoRows, StyledSegment } from "../MarkdownProcessor.js";
 
 import { DEFAULT_SESSION_TITLE } from "../../constants/session.js";
 import { loadSession, startNewSession } from "../../session.js";
@@ -244,89 +245,119 @@ export function processSlashCommandResult({
 }
 
 // Extended type for split messages - tracks when long messages are broken into multiple rows
-type ChatHistoryItemWithSplit = ChatHistoryItem & {
+export type ChatHistoryItemWithSplit = ChatHistoryItem & {
   splitMessage?: {
     isFirstRow: boolean;
     isLastRow: boolean;
     totalRows: number;
     rowIndex: number;
   };
+  // Pre-processed styled segments for this row - when present, these should be used instead of processing markdown
+  styledSegments?: StyledSegment[];
 };
 
 /**
  * Split message content into multiple ChatHistoryItems based on terminal width
- * For assistant messages, splits at natural markdown boundaries (like newlines)
- * For user/system messages, splits at word boundaries
+ * Now processes markdown into styled segments first, then splits those segments across rows
+ * This prevents markdown re-processing and flickering
  */
-function splitMessageContent(
+export function splitMessageContent(
   content: MessageContent,
   role: "user" | "assistant" | "system",
   contextItems: ChatHistoryItem["contextItems"],
   terminalWidth: number,
 ): ChatHistoryItemWithSplit[] {
-  const splitIntoRows = (text: string): string[] => {
-    return breakTextIntoRows(text, terminalWidth);
-  };
-
-  const processContent = (content: MessageContent): string[] => {
+  const processContent = (content: MessageContent): string => {
     if (typeof content === "string") {
-      return splitIntoRows(content);
+      return content;
     }
 
     if (!Array.isArray(content)) {
-      return splitIntoRows(JSON.stringify(content));
+      return JSON.stringify(content);
     }
 
-    // Handle MessagePart[] array
-    let allRows: string[] = [];
+    // Handle MessagePart[] array - convert to display format
+    let displayText = "";
     let imageCounter = 0;
 
     for (const part of content) {
       if (part.type === "text") {
-        const textRows = splitIntoRows(part.text);
-        allRows.push(...textRows);
+        displayText += part.text;
       } else if (part.type === "imageUrl") {
         imageCounter++;
-        allRows.push(`[Image #${imageCounter}]`);
+        displayText += `[Image #${imageCounter}]`;
       } else {
         // Handle any other part types
-        const otherRows = splitIntoRows(JSON.stringify(part));
-        allRows.push(...otherRows);
+        displayText += JSON.stringify(part);
       }
     }
 
-    return allRows;
+    return displayText;
   };
 
-  const contentRows = processContent(content);
+  const fullContentText = processContent(content);
 
-  // If only one row, return as normal (not split) - avoids unnecessary metadata
-  if (contentRows.length === 1) {
-    return [{
+  // For assistant messages, process markdown into styled segments then split
+  if (role === "assistant") {
+    const styledSegments = processMarkdownToSegments(fullContentText);
+    const segmentRows = splitStyledSegmentsIntoRows(styledSegments, terminalWidth);
+
+    // If only one row, return as normal (not split) - avoids unnecessary metadata
+    if (segmentRows.length === 1) {
+      return [{
+        message: {
+          role,
+          content: fullContentText, // Keep original content for compatibility
+        },
+        contextItems: contextItems,
+        styledSegments: segmentRows[0],
+      }];
+    }
+
+    // Create separate ChatHistoryItems for each row with split metadata
+    return segmentRows.map((rowSegments, index) => ({
       message: {
         role,
-        content: contentRows[0],
+        content: rowSegments.map(seg => seg.text).join(''), // Reconstruct text for the row
+      },
+      contextItems: contextItems, // Share context items across all rows
+      styledSegments: rowSegments, // Pre-processed styled segments for this row
+      splitMessage: {
+        isFirstRow: index === 0,
+        isLastRow: index === segmentRows.length - 1,
+        totalRows: segmentRows.length,
+        rowIndex: index,
+      },
+    }));
+  } else {
+    // For user/system messages, use the old text-splitting approach
+    const textRows = breakTextIntoRows(fullContentText, terminalWidth);
+
+    // If only one row, return as normal (not split) - avoids unnecessary metadata
+    if (textRows.length === 1) {
+      return [{
+        message: {
+          role,
+          content: textRows[0],
+        },
+        contextItems: contextItems,
+      }];
+    }
+
+    return textRows.map((rowContent, index) => ({
+      message: {
+        role,
+        content: rowContent,
       },
       contextItems: contextItems,
-    }];
+      splitMessage: {
+        isFirstRow: index === 0,
+        isLastRow: index === textRows.length - 1,
+        totalRows: textRows.length,
+        rowIndex: index,
+      },
+    }));
   }
-
-  // Create separate ChatHistoryItems for each row with split metadata
-  // This allows each row to render independently (preventing flicker) while maintaining
-  // visual grouping through the splitMessage metadata
-  return contentRows.map((rowContent, index) => ({
-    message: {
-      role,
-      content: rowContent,
-    },
-    contextItems: contextItems, // Share context items across all rows
-    splitMessage: {
-      isFirstRow: index === 0,
-      isLastRow: index === contentRows.length - 1,
-      totalRows: contentRows.length,
-      rowIndex: index,
-    },
-  }));
 }
 
 /**
@@ -440,6 +471,35 @@ export async function handleSpecialCommands({
   }
 
   return false;
+}
+
+/**
+ * Process chat history to apply message splitting to assistant messages
+ * This ensures all assistant messages are properly split for terminal display
+ */
+export function processHistoryForTerminalDisplay(
+  history: ChatHistoryItem[],
+  terminalWidth: number,
+): ChatHistoryItem[] {
+  const processedHistory: ChatHistoryItem[] = [];
+  
+  for (const item of history) {
+    if (item.message.role === "assistant" && !item.splitMessage) {
+      // Split assistant messages that haven't been split yet
+      const splitMessages = splitMessageContent(
+        item.message.content,
+        "assistant",
+        item.contextItems || [],
+        terminalWidth
+      );
+      processedHistory.push(...splitMessages);
+    } else {
+      // Keep other messages as-is
+      processedHistory.push(item);
+    }
+  }
+  
+  return processedHistory;
 }
 
 /**
