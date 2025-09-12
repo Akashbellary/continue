@@ -9,16 +9,16 @@ import { getLastNPathParts } from "core/util/uri.js";
 import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "src/util/logger.js";
-import {
-  processMarkdownToSegments,
-  splitStyledSegmentsIntoRows,
-  StyledSegment,
-} from "../MarkdownProcessor.js";
 
 import { DEFAULT_SESSION_TITLE } from "../../constants/session.js";
 import { loadSession, startNewSession } from "../../session.js";
 import { posthogService } from "../../telemetry/posthogService.js";
 import { telemetryService } from "../../telemetry/telemetryService.js";
+import {
+  processMarkdownToSegments,
+  splitStyledSegmentsIntoRows,
+  StyledSegment,
+} from "../MarkdownProcessor.js";
 
 import { processImagePlaceholder } from "./useChat.imageProcessing.js";
 import { SlashCommandResult } from "./useChat.types.js";
@@ -293,7 +293,6 @@ export function splitMessageContent(
           message: {
             role,
             content: fullContentText, // Keep original content for compatibility
-            isStreaming: false, // Ensure completed messages are not marked as streaming
           },
           contextItems: contextItems,
           styledSegments: segmentRows[0],
@@ -306,7 +305,6 @@ export function splitMessageContent(
       message: {
         role,
         content: rowSegments.map((seg) => seg.text).join(""), // Reconstruct text for the row
-        isStreaming: false, // Ensure split messages are not marked as streaming
       },
       contextItems: contextItems, // Share context items across all rows
       styledSegments: rowSegments, // Pre-processed styled segments for this row
@@ -328,7 +326,6 @@ export function splitMessageContent(
           message: {
             role,
             content: textRows[0],
-            isStreaming: false,
           },
           contextItems: contextItems,
         },
@@ -339,7 +336,6 @@ export function splitMessageContent(
       message: {
         role,
         content: rowContent,
-        isStreaming: false,
       },
       contextItems: contextItems,
       splitMessage: {
@@ -476,7 +472,9 @@ export function processHistoryForTerminalDisplay(
   const processedHistory: ChatHistoryItem[] = [];
 
   for (const item of history) {
-    if (item.message.role === "assistant" && !item.splitMessage) {
+    const itemWithSplit = item as ChatHistoryItemWithSplit;
+    
+    if (item.message.role === "assistant" && !itemWithSplit.splitMessage) {
       // Don't split assistant messages that have tool calls - they need special handling in MemoizedMessage
       if (item.toolCallStates && item.toolCallStates.length > 0) {
         // Keep tool call messages intact

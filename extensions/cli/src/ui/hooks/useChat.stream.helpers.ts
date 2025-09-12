@@ -6,7 +6,10 @@ import { logger } from "src/util/logger.js";
 import { services } from "../../services/index.js";
 import { getCurrentSession, updateSessionTitle } from "../../session.js";
 
-import { generateSessionTitle, splitMessageContent } from "./useChat.helpers.js";
+import {
+  generateSessionTitle,
+  splitMessageContent,
+} from "./useChat.helpers.js";
 
 interface CreateStreamCallbacksOptions {
   setChatHistory: React.Dispatch<React.SetStateAction<ChatHistoryItem[]>>;
@@ -22,7 +25,13 @@ interface CreateStreamCallbacksOptions {
 export function createStreamCallbacks(
   options: CreateStreamCallbacksOptions,
 ): any {
-  const { setChatHistory, setActivePermissionRequest, llmApi, model, terminalWidth } = options;
+  const {
+    setChatHistory,
+    setActivePermissionRequest,
+    llmApi,
+    model,
+    terminalWidth,
+  } = options;
 
   return {
     onContent: (_: string) => {},
@@ -39,13 +48,10 @@ export function createStreamCallbacks(
             content,
             "assistant",
             [],
-            terminalWidth
+            terminalWidth,
           );
-          
-          setChatHistory((prev) => [
-            ...prev,
-            ...splitMessages,
-          ]);
+
+          setChatHistory((prev) => [...prev, ...splitMessages]);
         }
       } catch (error) {
         logger.error("Failed to update chat history", { error });

@@ -53,10 +53,16 @@ export function SessionSelector({
     const reservedLines = 9; // Account for status bar too
     const linesPerSession = 3;
     const availableHeight = Math.max(0, terminalHeight - reservedLines);
-    const maxDisplayableSessions = Math.max(1, Math.floor(availableHeight / linesPerSession));
+    const maxDisplayableSessions = Math.max(
+      1,
+      Math.floor(availableHeight / linesPerSession),
+    );
 
     // Further limit to ensure we never exceed screen bounds
-    const safeLimitedSessions = Math.min(maxDisplayableSessions, sessions.length);
+    const safeLimitedSessions = Math.min(
+      maxDisplayableSessions,
+      sessions.length,
+    );
 
     return sessions.slice(0, safeLimitedSessions);
   }, [sessions, terminalHeight]);
@@ -74,7 +80,11 @@ export function SessionSelector({
       if (displaySessions[selectedIndex]) {
         onSelect(displaySessions[selectedIndex].sessionId);
       }
-    } else if (key.escape || (key.ctrl && input === "d") || (key.ctrl && input === "c")) {
+    } else if (
+      key.escape ||
+      (key.ctrl && input === "d") ||
+      (key.ctrl && input === "c")
+    ) {
       onExit();
     }
   });

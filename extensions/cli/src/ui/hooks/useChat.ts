@@ -121,10 +121,16 @@ export function useChat({
     svc
       .initialize(currentSession, isRemoteMode)
       .then(() => {
-        const processedHistory = processHistoryForTerminalDisplay(svc.getHistory(), terminalWidth);
+        const processedHistory = processHistoryForTerminalDisplay(
+          svc.getHistory(),
+          terminalWidth,
+        );
         setChatHistoryView(processedHistory);
         const listener = () => {
-          const processedHistory = processHistoryForTerminalDisplay(svc.getHistory(), terminalWidth);
+          const processedHistory = processHistoryForTerminalDisplay(
+            svc.getHistory(),
+            terminalWidth,
+          );
           setChatHistoryView(processedHistory);
         };
         svc.on("stateChanged", listener);

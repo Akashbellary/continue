@@ -3,10 +3,12 @@ import React, { memo } from "react";
 
 import { ToolCallTitle } from "src/tools/ToolCallTitle.js";
 
-import type { ChatHistoryItem } from "../../../../../core/index.js";
 import { MessageContent } from "../../../../../core/index.js";
+import {
+  StyledSegmentRenderer,
+  processMarkdownToSegments,
+} from "../MarkdownProcessor.js";
 import { ToolResultSummary } from "../ToolResultSummary.js";
-import { StyledSegment, StyledSegmentRenderer, processMarkdownToSegments } from "../MarkdownProcessor.js";
 import { ChatHistoryItemWithSplit } from "../hooks/useChat.helpers.js";
 
 /**
@@ -48,7 +50,13 @@ interface MemoizedMessageProps {
 
 export const MemoizedMessage = memo<MemoizedMessageProps>(
   ({ item, index }) => {
-    const { message, toolCallStates, conversationSummary, splitMessage, styledSegments } = item;
+    const {
+      message,
+      toolCallStates,
+      conversationSummary,
+      splitMessage,
+      styledSegments,
+    } = item;
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
     const isAssistant = message.role === "assistant";
@@ -95,8 +103,13 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
             <Box marginBottom={1}>
               <Text color="white">●</Text>
               <Text> </Text>
-              <StyledSegmentRenderer 
-                segments={styledSegments || processMarkdownToSegments(formatMessageContentForDisplay(message.content))} 
+              <StyledSegmentRenderer
+                segments={
+                  styledSegments ||
+                  processMarkdownToSegments(
+                    formatMessageContentForDisplay(message.content),
+                  )
+                }
               />
             </Box>
           )}
@@ -164,7 +177,12 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
     // Handle regular messages
     // Never show streaming indicator for split messages or messages with pre-processed segments
     // (they represent completed, processed content)
-    const isStreaming = isAssistant && !message.content && !toolCallStates && !splitMessage && !styledSegments;
+    const isStreaming =
+      isAssistant &&
+      !message.content &&
+      !toolCallStates &&
+      !splitMessage &&
+      !styledSegments;
 
     // For split messages: only show bullet on first row and remove
     // spacing between rows so multiple rows appear as one message
@@ -183,8 +201,13 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
             {formatMessageContentForDisplay(message.content)}
           </Text>
         ) : (
-          <StyledSegmentRenderer 
-            segments={styledSegments || processMarkdownToSegments(formatMessageContentForDisplay(message.content))} 
+          <StyledSegmentRenderer
+            segments={
+              styledSegments ||
+              processMarkdownToSegments(
+                formatMessageContentForDisplay(message.content),
+              )
+            }
           />
         )}
         {isStreaming && <Text color="gray">▋</Text>}

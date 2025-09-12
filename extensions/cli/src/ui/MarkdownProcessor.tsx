@@ -16,14 +16,14 @@ export interface StyledSegment {
     italic?: boolean;
     strikethrough?: boolean;
     color?: string;
-    type?: 'text' | 'code' | 'codeblock' | 'heading' | 'think';
+    type?: "text" | "code" | "codeblock" | "heading" | "think";
     language?: string; // For code blocks
   };
 }
 
 interface MarkdownPattern {
   regex: RegExp;
-  getStyle: (match: RegExpExecArray) => StyledSegment['styling'];
+  getStyle: (match: RegExpExecArray) => StyledSegment["styling"];
   getContent: (match: RegExpExecArray) => string;
 }
 
@@ -70,7 +70,7 @@ const patterns: MarkdownPattern[] = [
  */
 export function processMarkdownToSegments(
   text: string | null | undefined,
-  theme: SyntaxHighlighterTheme = defaultTheme
+  _theme: SyntaxHighlighterTheme = defaultTheme,
 ): StyledSegment[] {
   if (!text) {
     return [];
@@ -214,14 +214,18 @@ export function processMarkdownToSegments(
  * Render styled segments to React components
  */
 export function renderStyledSegments(
-  segments: StyledSegment[], 
-  theme: SyntaxHighlighterTheme = defaultTheme
+  segments: StyledSegment[],
+  theme: SyntaxHighlighterTheme = defaultTheme,
 ): React.ReactNode[] {
   return segments.map((segment, index) => {
     const key = `segment-${index}`;
-    
+
     if (segment.styling.type === "codeblock") {
-      const highlightedCode = highlightCode(segment.text, segment.styling.language || 'text', theme);
+      const highlightedCode = highlightCode(
+        segment.text,
+        segment.styling.language || "text",
+        theme,
+      );
       return <Text key={key}>{highlightedCode}</Text>;
     }
 
@@ -245,7 +249,7 @@ export function renderStyledSegments(
  */
 export function splitStyledSegmentsIntoRows(
   segments: StyledSegment[],
-  terminalWidth: number
+  terminalWidth: number,
 ): StyledSegment[][] {
   const availableWidth = terminalWidth - 6; // Account for bullet and spacing
   const rows: StyledSegment[][] = [];
@@ -254,21 +258,21 @@ export function splitStyledSegmentsIntoRows(
 
   for (const segment of segments) {
     const segmentText = segment.text;
-    
+
     // Handle segments with newlines
-    if (segmentText.includes('\n')) {
-      const lines = segmentText.split('\n');
-      
+    if (segmentText.includes("\n")) {
+      const lines = segmentText.split("\n");
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        
+
         if (i === 0) {
           // First line continues current row if there's space
           if (currentRowLength + line.length <= availableWidth) {
             if (line) {
               currentRow.push({
                 text: line,
-                styling: segment.styling
+                styling: segment.styling,
               });
               currentRowLength += line.length;
             }
@@ -277,13 +281,17 @@ export function splitStyledSegmentsIntoRows(
             if (currentRow.length > 0) {
               rows.push(currentRow);
             }
-            currentRow = line ? [{
-              text: line,
-              styling: segment.styling
-            }] : [];
+            currentRow = line
+              ? [
+                  {
+                    text: line,
+                    styling: segment.styling,
+                  },
+                ]
+              : [];
             currentRowLength = line.length;
           }
-          
+
           // End current row due to newline
           if (i < lines.length - 1) {
             rows.push(currentRow);
@@ -292,18 +300,24 @@ export function splitStyledSegmentsIntoRows(
           }
         } else if (i === lines.length - 1) {
           // Last line starts a new row
-          currentRow = line ? [{
-            text: line,
-            styling: segment.styling
-          }] : [];
+          currentRow = line
+            ? [
+                {
+                  text: line,
+                  styling: segment.styling,
+                },
+              ]
+            : [];
           currentRowLength = line.length;
         } else {
           // Middle lines get their own rows
           if (line) {
-            rows.push([{
-              text: line,
-              styling: segment.styling
-            }]);
+            rows.push([
+              {
+                text: line,
+                styling: segment.styling,
+              },
+            ]);
           } else {
             rows.push([]);
           }
@@ -313,65 +327,79 @@ export function splitStyledSegmentsIntoRows(
     }
 
     // Handle segments that need word wrapping
-    const words = segmentText.split(' ');
-    
+    const words = segmentText.split(" ");
+
     for (let i = 0; i < words.length; i++) {
       const word = words[i];
-      
+
       // Determine if we need a space before this word
       // Need space if: current row has content AND this is the first word in the current segment
       // OR: this is not the first word in the current segment (words within segment need spaces)
       const needsSpaceBefore = (currentRowLength > 0 && i === 0) || i > 0;
-      const spaceToAdd = needsSpaceBefore ? ' ' : '';
+      const spaceToAdd = needsSpaceBefore ? " " : "";
       const totalLength = word.length + spaceToAdd.length;
-      
+
       if (currentRowLength + totalLength <= availableWidth) {
         // Word fits in current row
         const textToAdd = spaceToAdd + word;
-        
-        if (currentRow.length > 0 && 
-            currentRow[currentRow.length - 1].styling.type === segment.styling.type &&
-            currentRow[currentRow.length - 1].styling.bold === segment.styling.bold &&
-            currentRow[currentRow.length - 1].styling.italic === segment.styling.italic &&
-            currentRow[currentRow.length - 1].styling.color === segment.styling.color) {
+
+        if (
+          currentRow.length > 0 &&
+          currentRow[currentRow.length - 1].styling.type ===
+            segment.styling.type &&
+          currentRow[currentRow.length - 1].styling.bold ===
+            segment.styling.bold &&
+          currentRow[currentRow.length - 1].styling.italic ===
+            segment.styling.italic &&
+          currentRow[currentRow.length - 1].styling.color ===
+            segment.styling.color
+        ) {
           // Merge with previous segment if styling matches
           currentRow[currentRow.length - 1].text += textToAdd;
         } else {
           // Add as new segment
           currentRow.push({
             text: textToAdd,
-            styling: segment.styling
+            styling: segment.styling,
           });
         }
-        
+
         currentRowLength += totalLength;
       } else {
         // Word doesn't fit, start new row
         if (currentRow.length > 0) {
           rows.push(currentRow);
         }
-        
+
         // Check if single word is longer than available width
         if (word.length > availableWidth) {
           // Split long word by characters as fallback
           let remainingWord = word;
           while (remainingWord.length > availableWidth) {
-            rows.push([{
-              text: remainingWord.substring(0, availableWidth),
-              styling: segment.styling
-            }]);
+            rows.push([
+              {
+                text: remainingWord.substring(0, availableWidth),
+                styling: segment.styling,
+              },
+            ]);
             remainingWord = remainingWord.substring(availableWidth);
           }
-          currentRow = remainingWord ? [{
-            text: remainingWord,
-            styling: segment.styling
-          }] : [];
+          currentRow = remainingWord
+            ? [
+                {
+                  text: remainingWord,
+                  styling: segment.styling,
+                },
+              ]
+            : [];
           currentRowLength = remainingWord.length;
         } else {
-          currentRow = [{
-            text: word,
-            styling: segment.styling
-          }];
+          currentRow = [
+            {
+              text: word,
+              styling: segment.styling,
+            },
+          ];
           currentRowLength = word.length;
         }
       }
