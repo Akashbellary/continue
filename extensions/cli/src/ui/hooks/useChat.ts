@@ -61,6 +61,7 @@ export function useChat({
   onClear,
   isRemoteMode = false,
   remoteUrl,
+  terminalWidth,
 }: UseChatProps) {
   const { exit } = useApp();
 
@@ -220,7 +221,11 @@ export function useChat({
     const initializeHistory = async () => {
       // Only add system message if we don't have any messages yet
       if (chatHistory.length === 0) {
-        const history = await initChatHistory(resume, initialRules);
+        const history = await initChatHistory(
+          terminalWidth,
+          resume,
+          initialRules,
+        );
         setChatHistory(history);
       }
       setIsChatHistoryInitialized(true);
@@ -287,6 +292,7 @@ export function useChat({
         setActivePermissionRequest,
         llmApi,
         model,
+        terminalWidth,
       });
 
       // Execute streaming chat response
@@ -494,6 +500,7 @@ export function useChat({
       const formattedQueuedMessages = await formatMessageWithFiles(
         message,
         [], // No attached files for queued messages
+        terminalWidth,
         imageMap,
       );
 
@@ -556,6 +563,7 @@ export function useChat({
       const newUserMessages = await formatMessageWithFiles(
         message,
         attachedFiles,
+        terminalWidth,
         imageMap,
       );
       logger.debug("Message formatted successfully");
@@ -703,6 +711,7 @@ export function useChat({
 
   const resetChatHistory = async () => {
     const newHistory = await initChatHistory(
+      terminalWidth,
       false, // Don't resume when resetting
       additionalRules,
     );

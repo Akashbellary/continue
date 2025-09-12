@@ -13,6 +13,7 @@ interface CreateStreamCallbacksOptions {
   setActivePermissionRequest: React.Dispatch<React.SetStateAction<any>>;
   llmApi?: any;
   model?: any;
+  terminalWidth: number;
 }
 
 /**
@@ -21,7 +22,7 @@ interface CreateStreamCallbacksOptions {
 export function createStreamCallbacks(
   options: CreateStreamCallbacksOptions,
 ): any {
-  const { setChatHistory, setActivePermissionRequest, llmApi, model } = options;
+  const { setChatHistory, setActivePermissionRequest, llmApi, model, terminalWidth } = options;
 
   return {
     onContent: (_: string) => {},

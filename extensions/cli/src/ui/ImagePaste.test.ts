@@ -74,21 +74,22 @@ describe("Image Pasting Functionality", () => {
       const results = await formatMessageWithFiles(
         message,
         attachedFiles,
+        80, // terminalWidth
         imageMap,
       );
 
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBeGreaterThan(0);
-      
+
       // Since we now split messages, let's just check the first result
       const firstResult = results[0];
       expect(firstResult.message.role).toBe("user");
-      
+
       // The content should now be a string (since each row is split)
       expect(typeof firstResult.message.content).toBe("string");
-      
+
       // Check that the content contains expected parts (image placeholder or text)
-      const allContent = results.map(r => r.message.content).join("");
+      const allContent = results.map((r) => r.message.content).join("");
       expect(allContent).toContain("Here is an image:");
       expect(allContent).toContain("[Image #1]");
       expect(allContent).toContain("and some text");
@@ -102,10 +103,10 @@ describe("Image Pasting Functionality", () => {
       const message = "Just text, no images";
       const attachedFiles: Array<{ path: string; content: string }> = [];
 
-      const results = await formatMessageWithFiles(message, attachedFiles);
+      const results = await formatMessageWithFiles(message, attachedFiles, 80);
 
       expect(Array.isArray(results)).toBe(true);
-      const allContent = results.map(r => r.message.content).join("");
+      const allContent = results.map((r) => r.message.content).join("");
       expect(results[0].message.role).toBe("user");
       expect(allContent).toBe("Just text, no images");
     });
@@ -125,14 +126,15 @@ describe("Image Pasting Functionality", () => {
       const results = await formatMessageWithFiles(
         message,
         attachedFiles,
+        80, // terminalWidth
         imageMap,
       );
 
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBeGreaterThan(0);
-      
+
       // Check that all expected content is present in the split messages
-      const allContent = results.map(r => r.message.content).join("");
+      const allContent = results.map((r) => r.message.content).join("");
       expect(allContent).toContain("First");
       expect(allContent).toContain("[Image #1]");
       expect(allContent).toContain("then text");
