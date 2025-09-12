@@ -1,7 +1,5 @@
 import path from "path";
 
-import React from "react";
-
 import { formatToolArgument } from "src/tools/formatters.js";
 import { getToolDisplayName } from "src/tools/index.js";
 
@@ -10,7 +8,7 @@ import { StyledSegment } from "./MarkdownProcessor.js";
 const MAX_BASH_OUTPUT_LINES = 4;
 const MAX_DIFF_LINES = 16;
 
-// Color constants for diff display (from ColoredDiff)
+// Color constants for diff display
 const DIFF_COLORS = {
   ADDITION_BG: "#325b30",
   DELETION_BG: "#712f37",
@@ -21,7 +19,6 @@ const DIFF_COLORS = {
 export interface ToolResultRow {
   type: "header" | "content" | "summary";
   segments: StyledSegment[];
-  component?: React.ReactNode; // For complex components like ColoredDiff
 }
 
 /**
@@ -131,8 +128,18 @@ function processChecklistRows(content: string): ToolResultRow[] {
 /**
  * Helper: Process Write/Edit/MultiEdit results into success message + diff rows
  */
-function processFileEditRows(toolName: string | undefined, content: string): ToolResultRow[] | null {
-  if (!(toolName === "Write" || toolName === "Edit" || toolName === "MultiEdit") || !content.includes("Diff:\n")) {
+function processFileEditRows(
+  toolName: string | undefined,
+  content: string,
+): ToolResultRow[] | null {
+  if (
+    !(
+      toolName === "Write" ||
+      toolName === "Edit" ||
+      toolName === "MultiEdit"
+    ) ||
+    !content.includes("Diff:\n")
+  ) {
     return null;
   }
 
@@ -227,13 +234,13 @@ function processBashOutputRows(content: string): ToolResultRow[] {
 
 /**
  * TOOL RESULT SEGMENTATION: Convert complex tool outputs into pre-styled rows
- * 
+ *
  * Processes tool outputs upstream to prevent flickering:
  * 1. Convert tool outputs into individual rows with pre-computed styled segments
  * 2. Handle multi-row outputs (checklists, diffs, bash output) at this level
  * 3. Return ToolResultRow objects that become separate MemoizedMessage components
  * 4. Each row renders instantly with pre-styled segments
- * 
+ *
  * Complex tool result types that create multiple rows:
  * - Checklist: Header + checkbox rows with status indicators and strikethrough
  * - Write/Edit diffs: Success message + diff lines with +/- styling and colors

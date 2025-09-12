@@ -95,15 +95,6 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
     if (toolResultRow) {
       const marginBottom = toolResultRow.isLastToolRow ? 1 : 0;
 
-      if (toolResultRow.rowData.component) {
-        // Render custom component (for complex components like ColoredDiff)
-        return (
-          <Box key={index} marginBottom={marginBottom}>
-            {toolResultRow.rowData.component}
-          </Box>
-        );
-      }
-
       return (
         <Box key={index} marginBottom={marginBottom}>
           <StyledSegmentRenderer segments={toolResultRow.rowData.segments} />
