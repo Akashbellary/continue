@@ -21,86 +21,8 @@ import {
 } from "../MarkdownProcessor.js";
 
 import { processImagePlaceholder } from "./useChat.imageProcessing.js";
+import { breakTextIntoRows } from "./useChat.splitLines.helpers.js";
 import { SlashCommandResult } from "./useChat.types.js";
-
-// Helper function to break text into chunks that fit within available width
-// Respects word boundaries to avoid splitting words across rows
-const breakTextIntoRows = (text: string, width: number): string[] => {
-  const rows: string[] = [];
-  let currentRow = "";
-  const availableWidth = width - 6;
-
-  const words = text.split(" ");
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-
-    // Check if word contains explicit newlines
-    if (word.includes("\n")) {
-      const parts = word.split("\n");
-
-      // Add first part to current row if there's space
-      if (parts[0]) {
-        const testRow = currentRow + (currentRow ? " " : "") + parts[0];
-        if (testRow.length <= availableWidth) {
-          currentRow = testRow;
-        } else {
-          // Current word doesn't fit, start new row
-          if (currentRow) {
-            rows.push(currentRow);
-          }
-          currentRow = parts[0];
-        }
-      }
-
-      // Handle newline breaks
-      if (currentRow || parts[0] === "") {
-        rows.push(currentRow);
-      }
-
-      // Process remaining parts after newlines
-      for (let j = 1; j < parts.length - 1; j++) {
-        rows.push(parts[j]);
-      }
-
-      // Set current row to last part
-      currentRow = parts[parts.length - 1] || "";
-    } else {
-      // Regular word without newlines
-      const testRow = currentRow + (currentRow ? " " : "") + word;
-
-      if (testRow.length <= availableWidth) {
-        // Word fits in current row
-        currentRow = testRow;
-      } else {
-        // Word doesn't fit, start new row
-        if (currentRow) {
-          rows.push(currentRow);
-        }
-
-        // Check if single word is longer than available width
-        if (word.length > availableWidth) {
-          // Split long word by characters as fallback
-          let remainingWord = word;
-          while (remainingWord.length > availableWidth) {
-            rows.push(remainingWord.substring(0, availableWidth));
-            remainingWord = remainingWord.substring(availableWidth);
-          }
-          currentRow = remainingWord;
-        } else {
-          currentRow = word;
-        }
-      }
-    }
-  }
-
-  // Add the final row if it has content
-  if (currentRow.length > 0 || rows.length === 0) {
-    rows.push(currentRow);
-  }
-
-  return rows;
-};
 
 /**
  * Initialize chat history
@@ -473,7 +395,7 @@ export function processHistoryForTerminalDisplay(
 
   for (const item of history) {
     const itemWithSplit = item as ChatHistoryItemWithSplit;
-    
+
     if (item.message.role === "assistant" && !itemWithSplit.splitMessage) {
       // Don't split assistant messages that have tool calls - they need special handling in MemoizedMessage
       if (item.toolCallStates && item.toolCallStates.length > 0) {

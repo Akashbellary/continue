@@ -1,5 +1,5 @@
-import React from "react";
 import { Text } from "ink";
+import React from "react";
 
 import {
   defaultTheme,
@@ -243,6 +243,182 @@ export function renderStyledSegments(
   });
 }
 
+interface RowState {
+  rows: StyledSegment[][];
+  currentRow: StyledSegment[];
+  currentRowLength: number;
+}
+
+/**
+ * Helper to create a styled segment
+ */
+function createSegment(
+  text: string,
+  styling: StyledSegment["styling"],
+): StyledSegment {
+  return { text, styling };
+}
+
+/**
+ * Helper to finish current row and start a new one
+ */
+function finishRow(state: RowState): void {
+  if (state.currentRow.length > 0) {
+    state.rows.push(state.currentRow);
+  }
+  state.currentRow = [];
+  state.currentRowLength = 0;
+}
+
+/**
+ * Helper to check if two styling objects match
+ */
+function stylingMatches(
+  a: StyledSegment["styling"],
+  b: StyledSegment["styling"],
+): boolean {
+  return (
+    a.type === b.type &&
+    a.bold === b.bold &&
+    a.italic === b.italic &&
+    a.color === b.color
+  );
+}
+
+/**
+ * Handle segments with newlines
+ */
+function processSegmentWithNewlines(
+  segment: StyledSegment,
+  state: RowState,
+  availableWidth: number,
+): void {
+  const lines = segment.text.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isFirstLine = i === 0;
+    const isLastLine = i === lines.length - 1;
+
+    if (isFirstLine) {
+      // First line continues current row if there's space
+      const fitsInCurrentRow =
+        state.currentRowLength + line.length <= availableWidth;
+
+      if (fitsInCurrentRow && line) {
+        state.currentRow.push(createSegment(line, segment.styling));
+        state.currentRowLength += line.length;
+      } else if (!fitsInCurrentRow) {
+        // Doesn't fit, start new row
+        finishRow(state);
+        if (line) {
+          state.currentRow.push(createSegment(line, segment.styling));
+          state.currentRowLength = line.length;
+        }
+      }
+
+      // End current row due to newline (unless it's the last line)
+      if (!isLastLine) {
+        finishRow(state);
+      }
+    } else if (isLastLine) {
+      // Last line starts a new row
+      if (line) {
+        state.currentRow.push(createSegment(line, segment.styling));
+        state.currentRowLength = line.length;
+      }
+    } else {
+      // Middle lines get their own rows
+      state.rows.push(line ? [createSegment(line, segment.styling)] : []);
+    }
+  }
+}
+
+/**
+ * Handle word that doesn't fit in current row
+ */
+function processWordThatDoesntFit(
+  word: string,
+  segment: StyledSegment,
+  state: RowState,
+  availableWidth: number,
+): void {
+  finishRow(state);
+
+  if (word.length > availableWidth) {
+    // Split long word by characters as fallback
+    let remainingWord = word;
+    while (remainingWord.length > availableWidth) {
+      state.rows.push([
+        createSegment(
+          remainingWord.substring(0, availableWidth),
+          segment.styling,
+        ),
+      ]);
+      remainingWord = remainingWord.substring(availableWidth);
+    }
+    if (remainingWord) {
+      state.currentRow.push(createSegment(remainingWord, segment.styling));
+      state.currentRowLength = remainingWord.length;
+    }
+  } else {
+    state.currentRow.push(createSegment(word, segment.styling));
+    state.currentRowLength = word.length;
+  }
+}
+
+/**
+ * Add word to current row, either by merging or creating new segment
+ */
+function addWordToRow(
+  textToAdd: string,
+  segment: StyledSegment,
+  state: RowState,
+): void {
+  const canMergeWithPrevious =
+    state.currentRow.length > 0 &&
+    stylingMatches(
+      state.currentRow[state.currentRow.length - 1].styling,
+      segment.styling,
+    );
+
+  if (canMergeWithPrevious) {
+    // Merge with previous segment if styling matches
+    state.currentRow[state.currentRow.length - 1].text += textToAdd;
+  } else {
+    // Add as new segment
+    state.currentRow.push(createSegment(textToAdd, segment.styling));
+  }
+}
+
+/**
+ * Process words in a segment that needs word wrapping
+ */
+function processWordsInSegment(
+  segment: StyledSegment,
+  state: RowState,
+  availableWidth: number,
+): void {
+  const words = segment.text.split(" ");
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const needsSpaceBefore = (state.currentRowLength > 0 && i === 0) || i > 0;
+    const spaceToAdd = needsSpaceBefore ? " " : "";
+    const totalLength = word.length + spaceToAdd.length;
+
+    if (state.currentRowLength + totalLength <= availableWidth) {
+      // Word fits in current row
+      const textToAdd = spaceToAdd + word;
+      addWordToRow(textToAdd, segment, state);
+      state.currentRowLength += totalLength;
+    } else {
+      // Word doesn't fit, start new row
+      processWordThatDoesntFit(word, segment, state, availableWidth);
+    }
+  }
+}
+
 /**
  * Split styled segments into rows based on terminal width while preserving styling
  * Each row contains segments that fit within the specified width
@@ -252,166 +428,26 @@ export function splitStyledSegmentsIntoRows(
   terminalWidth: number,
 ): StyledSegment[][] {
   const availableWidth = terminalWidth - 6; // Account for bullet and spacing
-  const rows: StyledSegment[][] = [];
-  let currentRow: StyledSegment[] = [];
-  let currentRowLength = 0;
+  const state: RowState = {
+    rows: [],
+    currentRow: [],
+    currentRowLength: 0,
+  };
 
   for (const segment of segments) {
-    const segmentText = segment.text;
-
-    // Handle segments with newlines
-    if (segmentText.includes("\n")) {
-      const lines = segmentText.split("\n");
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        if (i === 0) {
-          // First line continues current row if there's space
-          if (currentRowLength + line.length <= availableWidth) {
-            if (line) {
-              currentRow.push({
-                text: line,
-                styling: segment.styling,
-              });
-              currentRowLength += line.length;
-            }
-          } else {
-            // Doesn't fit, start new row
-            if (currentRow.length > 0) {
-              rows.push(currentRow);
-            }
-            currentRow = line
-              ? [
-                  {
-                    text: line,
-                    styling: segment.styling,
-                  },
-                ]
-              : [];
-            currentRowLength = line.length;
-          }
-
-          // End current row due to newline
-          if (i < lines.length - 1) {
-            rows.push(currentRow);
-            currentRow = [];
-            currentRowLength = 0;
-          }
-        } else if (i === lines.length - 1) {
-          // Last line starts a new row
-          currentRow = line
-            ? [
-                {
-                  text: line,
-                  styling: segment.styling,
-                },
-              ]
-            : [];
-          currentRowLength = line.length;
-        } else {
-          // Middle lines get their own rows
-          if (line) {
-            rows.push([
-              {
-                text: line,
-                styling: segment.styling,
-              },
-            ]);
-          } else {
-            rows.push([]);
-          }
-        }
-      }
-      continue;
-    }
-
-    // Handle segments that need word wrapping
-    const words = segmentText.split(" ");
-
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-
-      // Determine if we need a space before this word
-      // Need space if: current row has content AND this is the first word in the current segment
-      // OR: this is not the first word in the current segment (words within segment need spaces)
-      const needsSpaceBefore = (currentRowLength > 0 && i === 0) || i > 0;
-      const spaceToAdd = needsSpaceBefore ? " " : "";
-      const totalLength = word.length + spaceToAdd.length;
-
-      if (currentRowLength + totalLength <= availableWidth) {
-        // Word fits in current row
-        const textToAdd = spaceToAdd + word;
-
-        if (
-          currentRow.length > 0 &&
-          currentRow[currentRow.length - 1].styling.type ===
-            segment.styling.type &&
-          currentRow[currentRow.length - 1].styling.bold ===
-            segment.styling.bold &&
-          currentRow[currentRow.length - 1].styling.italic ===
-            segment.styling.italic &&
-          currentRow[currentRow.length - 1].styling.color ===
-            segment.styling.color
-        ) {
-          // Merge with previous segment if styling matches
-          currentRow[currentRow.length - 1].text += textToAdd;
-        } else {
-          // Add as new segment
-          currentRow.push({
-            text: textToAdd,
-            styling: segment.styling,
-          });
-        }
-
-        currentRowLength += totalLength;
-      } else {
-        // Word doesn't fit, start new row
-        if (currentRow.length > 0) {
-          rows.push(currentRow);
-        }
-
-        // Check if single word is longer than available width
-        if (word.length > availableWidth) {
-          // Split long word by characters as fallback
-          let remainingWord = word;
-          while (remainingWord.length > availableWidth) {
-            rows.push([
-              {
-                text: remainingWord.substring(0, availableWidth),
-                styling: segment.styling,
-              },
-            ]);
-            remainingWord = remainingWord.substring(availableWidth);
-          }
-          currentRow = remainingWord
-            ? [
-                {
-                  text: remainingWord,
-                  styling: segment.styling,
-                },
-              ]
-            : [];
-          currentRowLength = remainingWord.length;
-        } else {
-          currentRow = [
-            {
-              text: word,
-              styling: segment.styling,
-            },
-          ];
-          currentRowLength = word.length;
-        }
-      }
+    if (segment.text.includes("\n")) {
+      processSegmentWithNewlines(segment, state, availableWidth);
+    } else {
+      processWordsInSegment(segment, state, availableWidth);
     }
   }
 
   // Add the final row if it has content
-  if (currentRow.length > 0 || rows.length === 0) {
-    rows.push(currentRow);
+  if (state.currentRow.length > 0 || state.rows.length === 0) {
+    state.rows.push(state.currentRow);
   }
 
-  return rows;
+  return state.rows;
 }
 
 /**

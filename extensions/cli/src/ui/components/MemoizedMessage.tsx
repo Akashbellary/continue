@@ -4,12 +4,12 @@ import React, { memo } from "react";
 import { ToolCallTitle } from "src/tools/ToolCallTitle.js";
 
 import { MessageContent } from "../../../../../core/index.js";
+import { ChatHistoryItemWithSplit } from "../hooks/useChat.helpers.js";
 import {
   StyledSegmentRenderer,
   processMarkdownToSegments,
 } from "../MarkdownProcessor.js";
 import { ToolResultSummary } from "../ToolResultSummary.js";
-import { ChatHistoryItemWithSplit } from "../hooks/useChat.helpers.js";
 
 /**
  * Formats message content for display, converting message parts array back to
