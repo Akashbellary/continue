@@ -6,6 +6,7 @@ import type { ChatHistoryItem } from "../../../../../core/index.js";
 import type { MCPService } from "../../services/MCPService.js";
 import type { QueuedMessage } from "../../stream/messageQueue.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
+import { processHistoryForTerminalDisplay } from "../hooks/useChat.helpers.js";
 import { IntroMessage } from "../IntroMessage.js";
 
 interface StaticChatContentProps {
@@ -69,12 +70,14 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
     }
   }, [refreshTrigger, refreshStatic]);
 
-  // Filter out system messages without content
-  const filteredChatHistory = React.useMemo(() => {
-    return chatHistory.filter(
+  // Filter out system messages without content and process for terminal display
+  const processedChatHistory = React.useMemo(() => {
+    const filtered = chatHistory.filter(
       (item) => item.message.role !== "system" || item.message.content,
     );
-  }, [chatHistory]);
+    // Process the history to expand tool calls into individual rows
+    return processHistoryForTerminalDisplay(filtered, columns);
+  }, [chatHistory, columns]);
 
   // Split chat history into stable and pending items
   // The last two items may have pending tool calls
@@ -95,10 +98,10 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
     const PENDING_ITEMS_COUNT = 2;
     const stableCount = Math.max(
       0,
-      filteredChatHistory.length - PENDING_ITEMS_COUNT,
+      processedChatHistory.length - PENDING_ITEMS_COUNT,
     );
-    const stableHistory = filteredChatHistory.slice(0, stableCount);
-    const pendingHistory = filteredChatHistory.slice(stableCount);
+    const stableHistory = processedChatHistory.slice(0, stableCount);
+    const pendingHistory = processedChatHistory.slice(stableCount);
 
     // Add stable messages to static items
     stableHistory.forEach((item, index) => {
@@ -119,7 +122,7 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
     config,
     model,
     mcpService,
-    filteredChatHistory,
+    processedChatHistory,
     renderMessage,
   ]);
 
