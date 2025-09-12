@@ -308,6 +308,7 @@ export function splitMessageContent(
         message: {
           role,
           content: fullContentText, // Keep original content for compatibility
+          isStreaming: false, // Ensure completed messages are not marked as streaming
         },
         contextItems: contextItems,
         styledSegments: segmentRows[0],
@@ -319,6 +320,7 @@ export function splitMessageContent(
       message: {
         role,
         content: rowSegments.map(seg => seg.text).join(''), // Reconstruct text for the row
+        isStreaming: false, // Ensure split messages are not marked as streaming
       },
       contextItems: contextItems, // Share context items across all rows
       styledSegments: rowSegments, // Pre-processed styled segments for this row
@@ -339,6 +341,7 @@ export function splitMessageContent(
         message: {
           role,
           content: textRows[0],
+          isStreaming: false,
         },
         contextItems: contextItems,
       }];
@@ -348,6 +351,7 @@ export function splitMessageContent(
       message: {
         role,
         content: rowContent,
+        isStreaming: false,
       },
       contextItems: contextItems,
       splitMessage: {
@@ -485,14 +489,25 @@ export function processHistoryForTerminalDisplay(
   
   for (const item of history) {
     if (item.message.role === "assistant" && !item.splitMessage) {
-      // Split assistant messages that haven't been split yet
-      const splitMessages = splitMessageContent(
-        item.message.content,
-        "assistant",
-        item.contextItems || [],
-        terminalWidth
-      );
-      processedHistory.push(...splitMessages);
+      // Don't split assistant messages that have tool calls - they need special handling in MemoizedMessage
+      if (item.toolCallStates && item.toolCallStates.length > 0) {
+        // Keep tool call messages intact
+        processedHistory.push(item);
+      } else {
+        // Only split regular assistant messages without tool calls
+        const splitMessages = splitMessageContent(
+          item.message.content,
+          "assistant",
+          item.contextItems || [],
+          terminalWidth
+        );
+        // Preserve any other properties from the original item
+        const splitMessagesWithProps = splitMessages.map(splitMsg => ({
+          ...item,
+          ...splitMsg,
+        }));
+        processedHistory.push(...splitMessagesWithProps);
+      }
     } else {
       // Keep other messages as-is
       processedHistory.push(item);

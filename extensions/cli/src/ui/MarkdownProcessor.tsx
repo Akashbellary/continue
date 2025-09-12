@@ -317,11 +317,17 @@ export function splitStyledSegmentsIntoRows(
     
     for (let i = 0; i < words.length; i++) {
       const word = words[i];
-      const wordLength = word.length + (i > 0 ? 1 : 0); // Add space if not first word in segment
       
-      if (currentRowLength + wordLength <= availableWidth) {
+      // Determine if we need a space before this word
+      // Need space if: current row has content AND this is the first word in the current segment
+      // OR: this is not the first word in the current segment (words within segment need spaces)
+      const needsSpaceBefore = (currentRowLength > 0 && i === 0) || i > 0;
+      const spaceToAdd = needsSpaceBefore ? ' ' : '';
+      const totalLength = word.length + spaceToAdd.length;
+      
+      if (currentRowLength + totalLength <= availableWidth) {
         // Word fits in current row
-        const textToAdd = (currentRowLength > 0 && i === 0) ? ' ' + word : word;
+        const textToAdd = spaceToAdd + word;
         
         if (currentRow.length > 0 && 
             currentRow[currentRow.length - 1].styling.type === segment.styling.type &&
@@ -333,12 +339,12 @@ export function splitStyledSegmentsIntoRows(
         } else {
           // Add as new segment
           currentRow.push({
-            text: textToAdd.startsWith(' ') ? textToAdd : (currentRowLength > 0 ? ' ' : '') + textToAdd,
+            text: textToAdd,
             styling: segment.styling
           });
         }
         
-        currentRowLength += wordLength;
+        currentRowLength += totalLength;
       } else {
         // Word doesn't fit, start new row
         if (currentRow.length > 0) {
