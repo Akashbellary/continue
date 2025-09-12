@@ -2,7 +2,7 @@ import { Box, Text } from "ink";
 import React, { memo } from "react";
 
 import { MessageContent } from "../../../../../core/index.js";
-import { ChatHistoryItemWithSplit } from "../hooks/useChat.helpers.js";
+import { ChatHistoryItemWithSplit } from "../hooks/useChat.splitMessage.helpers.js";
 import {
   StyledSegmentRenderer,
   processMarkdownToSegments,

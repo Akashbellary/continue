@@ -283,7 +283,10 @@ function stylingMatches(
     a.type === b.type &&
     a.bold === b.bold &&
     a.italic === b.italic &&
-    a.color === b.color
+    a.strikethrough === b.strikethrough &&
+    a.color === b.color &&
+    a.backgroundColor === b.backgroundColor &&
+    a.language === b.language
   );
 }
 

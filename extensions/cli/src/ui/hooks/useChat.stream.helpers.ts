@@ -6,10 +6,8 @@ import { logger } from "src/util/logger.js";
 import { services } from "../../services/index.js";
 import { getCurrentSession, updateSessionTitle } from "../../session.js";
 
-import {
-  generateSessionTitle,
-  splitMessageContent,
-} from "./useChat.helpers.js";
+import { generateSessionTitle } from "./useChat.helpers.js";
+import { splitMessageContent } from "./useChat.splitMessage.helpers.js";
 
 interface CreateStreamCallbacksOptions {
   setChatHistory: React.Dispatch<React.SetStateAction<ChatHistoryItem[]>>;

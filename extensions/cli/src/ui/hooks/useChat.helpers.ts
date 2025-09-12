@@ -15,18 +15,15 @@ import { loadSession, startNewSession } from "../../session.js";
 import { posthogService } from "../../telemetry/posthogService.js";
 import { telemetryService } from "../../telemetry/telemetryService.js";
 import {
-  processMarkdownToSegments,
-  splitStyledSegmentsIntoRows,
-  StyledSegment,
-} from "../MarkdownProcessor.js";
+  splitMessageContent,
+  type ChatHistoryItemWithSplit,
+} from "./useChat.splitMessage.helpers.js";
 import {
   processToolResultIntoRows,
-  ToolResultRow,
   getToolCallTitleSegments,
 } from "../ToolResultProcessor.js";
 
 import { processImagePlaceholder } from "./useChat.imageProcessing.js";
-import { breakTextIntoRows } from "./useChat.splitLines.helpers.js";
 import { SlashCommandResult } from "./useChat.types.js";
 
 /**
@@ -152,135 +149,52 @@ export function processSlashCommandResult({
   return result.newInput || null;
 }
 
-// Extended type for split messages - tracks when long messages are broken into multiple rows
-export type ChatHistoryItemWithSplit = ChatHistoryItem & {
-  splitMessage?: {
-    isFirstRow: boolean;
-    isLastRow: boolean;
-    totalRows: number;
-    rowIndex: number;
-  };
-  // Pre-processed styled segments for this row - when present, these should be used instead of processing markdown
-  styledSegments?: StyledSegment[];
-  // For tool result rows - when present, this represents a single row from a tool result
-  toolResultRow?: {
-    toolCallId: string;
-    toolName: string;
-    rowData: ToolResultRow;
-    isFirstToolRow: boolean;
-    isLastToolRow: boolean;
-  };
-};
+/**
+ * Track telemetry for user message
+ */
+export function trackUserMessage(message: string, model?: any): void {
+  telemetryService.startActiveTime();
+  telemetryService.logUserPrompt(message.length, message);
+  posthogService.capture("chat", {
+    model: model?.name,
+    provider: model?.provider,
+  });
+}
+
+interface HandleSpecialCommandsOptions {
+  message: string;
+  isRemoteMode: boolean;
+  remoteUrl?: string;
+  onShowConfigSelector: () => void;
+  exit: () => void;
+}
 
 /**
- * Split message content into multiple ChatHistoryItems based on terminal width
- * Now processes markdown into styled segments first, then splits those segments across rows
- * This prevents markdown re-processing and flickering
+ * Handle special TUI commands
  */
-export function splitMessageContent(
-  content: MessageContent,
-  role: "user" | "assistant" | "system",
-  contextItems: ChatHistoryItem["contextItems"],
-  terminalWidth: number,
-): ChatHistoryItemWithSplit[] {
-  const processContent = (content: MessageContent): string => {
-    if (typeof content === "string") {
-      return content;
-    }
+export async function handleSpecialCommands({
+  message,
+  isRemoteMode,
+  remoteUrl,
+  onShowConfigSelector,
+  exit,
+}: HandleSpecialCommandsOptions): Promise<boolean> {
+  const trimmedMessage = message.trim();
 
-    if (!Array.isArray(content)) {
-      return JSON.stringify(content);
-    }
-
-    // Handle MessagePart[] array - convert to display format
-    let displayText = "";
-    let imageCounter = 0;
-
-    for (const part of content) {
-      if (part.type === "text") {
-        displayText += part.text;
-      } else if (part.type === "imageUrl") {
-        imageCounter++;
-        displayText += `[Image #${imageCounter}]`;
-      } else {
-        // Handle any other part types
-        displayText += JSON.stringify(part);
-      }
-    }
-
-    return displayText;
-  };
-
-  const fullContentText = processContent(content);
-
-  // For assistant messages, process markdown into styled segments then split
-  if (role === "assistant") {
-    const styledSegments = processMarkdownToSegments(fullContentText);
-    const segmentRows = splitStyledSegmentsIntoRows(
-      styledSegments,
-      terminalWidth,
-    );
-
-    // If only one row, return as normal (not split) - avoids unnecessary metadata
-    if (segmentRows.length === 1) {
-      return [
-        {
-          message: {
-            role,
-            content: fullContentText, // Keep original content for compatibility
-          },
-          contextItems: contextItems,
-          styledSegments: segmentRows[0],
-        },
-      ];
-    }
-
-    // Create separate ChatHistoryItems for each row with split metadata
-    return segmentRows.map((rowSegments, index) => ({
-      message: {
-        role,
-        content: rowSegments.map((seg) => seg.text).join(""), // Reconstruct text for the row
-      },
-      contextItems: contextItems, // Share context items across all rows
-      styledSegments: rowSegments, // Pre-processed styled segments for this row
-      splitMessage: {
-        isFirstRow: index === 0,
-        isLastRow: index === segmentRows.length - 1,
-        totalRows: segmentRows.length,
-        rowIndex: index,
-      },
-    }));
-  } else {
-    // For user/system messages, use the old text-splitting approach
-    const textRows = breakTextIntoRows(fullContentText, terminalWidth);
-
-    // If only one row, return as normal (not split) - avoids unnecessary metadata
-    if (textRows.length === 1) {
-      return [
-        {
-          message: {
-            role,
-            content: textRows[0],
-          },
-          contextItems: contextItems,
-        },
-      ];
-    }
-
-    return textRows.map((rowContent, index) => ({
-      message: {
-        role,
-        content: rowContent,
-      },
-      contextItems: contextItems,
-      splitMessage: {
-        isFirstRow: index === 0,
-        isLastRow: index === textRows.length - 1,
-        totalRows: textRows.length,
-        rowIndex: index,
-      },
-    }));
+  // Special handling for /config command in TUI
+  if (trimmedMessage === "/config") {
+    handleConfigCommand(onShowConfigSelector);
+    return true;
   }
+
+  // Handle /exit command in remote mode
+  if (isRemoteMode && remoteUrl && trimmedMessage === "/exit") {
+    const { handleRemoteExit } = await import("./useChat.remote.helpers.js");
+    await handleRemoteExit(remoteUrl, exit);
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -346,54 +260,6 @@ export async function formatMessageWithFiles(
     contextItems,
     terminalWidth,
   );
-}
-
-/**
- * Track telemetry for user message
- */
-export function trackUserMessage(message: string, model?: any): void {
-  telemetryService.startActiveTime();
-  telemetryService.logUserPrompt(message.length, message);
-  posthogService.capture("chat", {
-    model: model?.name,
-    provider: model?.provider,
-  });
-}
-
-interface HandleSpecialCommandsOptions {
-  message: string;
-  isRemoteMode: boolean;
-  remoteUrl?: string;
-  onShowConfigSelector: () => void;
-  exit: () => void;
-}
-
-/**
- * Handle special TUI commands
- */
-export async function handleSpecialCommands({
-  message,
-  isRemoteMode,
-  remoteUrl,
-  onShowConfigSelector,
-  exit,
-}: HandleSpecialCommandsOptions): Promise<boolean> {
-  const trimmedMessage = message.trim();
-
-  // Special handling for /config command in TUI
-  if (trimmedMessage === "/config") {
-    handleConfigCommand(onShowConfigSelector);
-    return true;
-  }
-
-  // Handle /exit command in remote mode
-  if (isRemoteMode && remoteUrl && trimmedMessage === "/exit") {
-    const { handleRemoteExit } = await import("./useChat.remote.helpers.js");
-    await handleRemoteExit(remoteUrl, exit);
-    return true;
-  }
-
-  return false;
 }
 
 /**
