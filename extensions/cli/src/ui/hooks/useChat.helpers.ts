@@ -279,7 +279,6 @@ function processAssistantMessageContent(
     item.contextItems || [],
     terminalWidth,
   );
-  
   return splitMessages.map((splitMsg) => ({
     ...item,
     ...splitMsg,
@@ -297,7 +296,8 @@ function createToolCallHeaderRow(
   const toolName = toolState.toolCall.function.name;
   const toolArgs = toolState.parsedArgs;
   const isCompleted = toolState.status === "done";
-  const isErrored = toolState.status === "errored" || toolState.status === "canceled";
+  const isErrored =
+    toolState.status === "errored" || toolState.status === "canceled";
 
   return {
     message: {
@@ -345,32 +345,35 @@ function processToolCallOutput(
   }
 
   const toolName = toolState.toolCall.function.name;
-  const isErrored = toolState.status === "errored" || toolState.status === "canceled";
+  const isErrored =
+    toolState.status === "errored" || toolState.status === "canceled";
 
   if (isErrored) {
-    return [{
-      message: {
-        role: "assistant",
-        content: "",
-      },
-      contextItems: item.contextItems,
-      toolResultRow: {
-        toolCallId: toolState.toolCallId,
-        toolName,
-        rowData: {
-          type: "content",
-          segments: [
-            { text: "  ", styling: {} }, // Indentation
-            {
-              text: toolState.output[0].content ?? "Tool execution failed",
-              styling: { color: "red" },
-            },
-          ],
+    return [
+      {
+        message: {
+          role: "assistant",
+          content: "",
         },
-        isFirstToolRow: false,
-        isLastToolRow: true,
-      },
-    } as ChatHistoryItemWithSplit];
+        contextItems: item.contextItems,
+        toolResultRow: {
+          toolCallId: toolState.toolCallId,
+          toolName,
+          rowData: {
+            type: "content",
+            segments: [
+              { text: "  ", styling: {} }, // Indentation
+              {
+                text: toolState.output[0].content ?? "Tool execution failed",
+                styling: { color: "red" },
+              },
+            ],
+          },
+          isFirstToolRow: false,
+          isLastToolRow: true,
+        },
+      } as ChatHistoryItemWithSplit,
+    ];
   }
 
   // Process tool output into multiple rows
@@ -380,20 +383,23 @@ function processToolCallOutput(
     content,
   });
 
-  return toolResultRows.map((rowData, rowIndex) => ({
-    message: {
-      role: "assistant",
-      content: "",
-    },
-    contextItems: item.contextItems,
-    toolResultRow: {
-      toolCallId: toolState.toolCallId,
-      toolName,
-      rowData,
-      isFirstToolRow: false,
-      isLastToolRow: rowIndex === toolResultRows.length - 1,
-    },
-  } as ChatHistoryItemWithSplit));
+  return toolResultRows.map(
+    (rowData, rowIndex) =>
+      ({
+        message: {
+          role: "assistant",
+          content: "",
+        },
+        contextItems: item.contextItems,
+        toolResultRow: {
+          toolCallId: toolState.toolCallId,
+          toolName,
+          rowData,
+          isFirstToolRow: false,
+          isLastToolRow: rowIndex === toolResultRows.length - 1,
+        },
+      }) as ChatHistoryItemWithSplit,
+  );
 }
 
 /**
@@ -428,13 +434,13 @@ function processAssistantWithToolCalls(
 
 /**
  * CORE ARCHITECTURE: Pre-process all chat content into terminal-width rows
- * 
+ *
  * Anti-flickering strategy that processes all text and tool results upstream:
  * 1. Split all content into terminal-width-sized rows
  * 2. Pre-process markdown into styled segments with text/color formatting
  * 3. Expand tool calls into individual result rows with pre-styled segments
  * 4. Pass down small, pre-styled pieces that render instantly
- * 
+ *
  * Each MemoizedMessage receives pre-computed segments, eliminating markdown
  * processing and preventing recomputation during terminal resizing.
  */
