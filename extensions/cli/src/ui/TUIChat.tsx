@@ -185,6 +185,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
 
   const {
     chatHistory,
+    rawChatHistory,
     setChatHistory,
     isWaitingForResponse,
     responseStartTime,
@@ -230,7 +231,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
 
   // Calculate context percentage
   const contextData = useContextPercentage({
-    chatHistory,
+    chatHistory: rawChatHistory, // Use raw ChatHistoryItem[] for token calculation
     model: services.model?.model || undefined,
   });
 

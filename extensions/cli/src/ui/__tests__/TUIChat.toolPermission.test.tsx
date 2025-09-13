@@ -298,7 +298,7 @@ describe("TUIChat - Tool Permission Tests", () => {
 
   it("shows tool result with red dot and 'Cancelled by user' message", async () => {
     // Import the components we need for this test
-    const { ToolResultProcessor } = await import("../ToolResultProcessor.js");
+    const { processToolResultIntoRows } = await import("../processors/toolResultProcessor.js");
     const { MemoizedMessage } = await import(
       "../components/MemoizedMessage.js"
     );

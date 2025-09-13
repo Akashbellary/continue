@@ -21,7 +21,6 @@ import {
 
 import { processImagePlaceholder } from "./useChat.imageProcessing.js";
 import {
-  splitMessageContent,
   type ChatHistoryItemWithSplit,
 } from "./useChat.splitMessage.helpers.js";
 import { SlashCommandResult } from "./useChat.types.js";
@@ -198,14 +197,15 @@ export async function handleSpecialCommands({
 }
 
 /**
- * Format message with attached files and images - returns multiple ChatHistoryItems (one per row)
+ * Format message with attached files and images - returns single ChatHistoryItem
+ * Updated for MessageRow architecture: keep as single item, split during rendering
  */
 export async function formatMessageWithFiles(
   message: string,
   attachedFiles: Array<{ path: string; content: string }>,
   terminalWidth: number,
   imageMap?: Map<string, Buffer>,
-): Promise<ChatHistoryItemWithSplit[]> {
+): Promise<ChatHistoryItem[]> {
   // Convert attached files to context items
   const contextItems = attachedFiles.map((file) => ({
     id: {
@@ -253,13 +253,14 @@ export async function formatMessageWithFiles(
     }
   }
 
-  // Split the message content into multiple ChatHistoryItems
-  return splitMessageContent(
-    messageContent,
-    "user",
+  // Return single ChatHistoryItem - splitting will happen during MessageRow processing
+  return [{
+    message: {
+      role: "user",
+      content: messageContent,
+    },
     contextItems,
-    terminalWidth,
-  );
+  }];
 }
 
 /**

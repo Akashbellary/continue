@@ -2,21 +2,20 @@ import type { AssistantUnrolled, ModelConfig } from "@continuedev/config-yaml";
 import { Box, Static, Text, useStdout } from "ink";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ChatHistoryItem } from "../../../../../core/index.js";
 import type { MCPService } from "../../services/MCPService.js";
 import type { QueuedMessage } from "../../stream/messageQueue.js";
-import { processHistoryForTerminalDisplay } from "../hooks/useChat.helpers.js";
 import { useTerminalSize } from "../hooks/useTerminalSize.js";
 import { IntroMessage } from "../IntroMessage.js";
+import type { MessageRow } from "../types/messageTypes.js";
 
 interface StaticChatContentProps {
   showIntroMessage: boolean;
   config?: AssistantUnrolled;
   model?: ModelConfig;
   mcpService?: MCPService;
-  chatHistory: ChatHistoryItem[];
+  chatHistory: MessageRow[];
   queuedMessages?: QueuedMessage[];
-  renderMessage: (item: ChatHistoryItem, index: number) => React.ReactElement;
+  renderMessage: (row: MessageRow, index: number) => React.ReactElement;
   refreshTrigger?: number; // Add a prop to trigger refresh from parent
 }
 
@@ -70,14 +69,14 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
     }
   }, [refreshTrigger, refreshStatic]);
 
-  // Filter out system messages without content and process for terminal display
+  // Filter out system messages without content (MessageRow format)
   const processedChatHistory = React.useMemo(() => {
-    const filtered = chatHistory.filter(
-      (item) => item.message.role !== "system" || item.message.content,
+    // ChatHistory is already processed into MessageRow format
+    // Just filter out empty system messages
+    return chatHistory.filter(
+      (row) => row.role !== "system" || (row.segments.length > 0 && row.segments[0].text.trim()),
     );
-    // Process the history to expand tool calls into individual rows
-    return processHistoryForTerminalDisplay(filtered, columns);
-  }, [chatHistory, columns]);
+  }, [chatHistory]);
 
   // Split chat history into stable and pending items
   // The last two items may have pending tool calls
