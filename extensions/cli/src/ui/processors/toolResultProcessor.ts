@@ -1,3 +1,4 @@
+import path from "path";
 
 import { formatToolArgument } from "src/tools/formatters.js";
 import { getToolDisplayName } from "src/tools/index.js";
@@ -48,173 +49,474 @@ export function getToolCallTitleSegments(
     if (valueLines.length === 1) {
       formattedValue = formatToolArgument(value);
     } else {
-      // For multi-line strings, just show the tool name
-      return [{ text: displayName, styling: { bold: true } }];
+      // For multi-line strings, show first line with ellipsis
+      const firstLine = valueLines[0].trim();
+      formattedValue = firstLine
+        ? `${formatToolArgument(firstLine)}...`
+        : "...";
     }
-  }
-
-  if (!formattedValue) {
-    return [{ text: displayName, styling: { bold: true } }];
   }
 
   return [
     { text: displayName, styling: { bold: true } },
-    { text: " ", styling: {} },
-    { text: formattedValue, styling: { color: "gray" } },
+    { text: `(${formattedValue})`, styling: {} },
   ];
 }
 
-/**
- * Process tool result content into styled rows
- * Converts tool output into formatted segments for display
- */
-export function processToolResultIntoRows(toolResult: {
-  toolName: string;
+interface ToolResultSummaryProps {
+  toolName?: string;
   content: string;
-}): ToolResultRow[] {
-  const { toolName, content } = toolResult;
-
-  if (!content || content.trim().length === 0) {
-    return [];
-  }
-
-  // Handle different tool types with specific formatting
-  if (toolName === "Bash") {
-    return processBashOutput(content);
-  } else if (toolName === "Read" || toolName === "Edit" || toolName === "Write") {
-    return processFileOutput(content);
-  } else if (toolName === "Grep" || toolName === "Glob") {
-    return processSearchOutput(content);
-  } else {
-    return processGenericOutput(content);
-  }
 }
 
 /**
- * Process bash command output with line limits
+ * Helper: Process checklist content into header + checkbox rows with status styling
  */
-function processBashOutput(content: string): ToolResultRow[] {
+function processChecklistRows(content: string): ToolResultRow[] {
+  const rows: ToolResultRow[] = [
+    {
+      type: "header",
+      segments: [
+        { text: "⎿ ", styling: { color: "gray" } },
+        { text: "Task List Updated", styling: { color: "blue" } },
+      ],
+    },
+  ];
+
   const lines = content.split("\n");
-  
-  if (lines.length <= MAX_BASH_OUTPUT_LINES) {
-    // Show all output
-    return [{
-      type: "content",
-      segments: lines.map(line => ({
-        text: `  ${line}\n`,
-        styling: { color: "white" },
-      })).flat(),
-    }];
+  for (const line of lines) {
+    if (line.startsWith("Task list")) {
+      continue; // Skip header line
+    }
+
+    const checkboxMatch = line.match(/^(\s*)-\s*\[([ x])\]\s*(.*)$/);
+    if (checkboxMatch) {
+      const [, indent, status, taskText] = checkboxMatch;
+      const isCompleted = status === "x";
+
+      rows.push({
+        type: "content",
+        segments: [
+          { text: "  " + indent, styling: {} }, // Padding + indent
+          {
+            text: isCompleted ? "✓" : "○",
+            styling: { color: isCompleted ? "green" : "yellow" },
+          },
+          { text: " ", styling: {} },
+          {
+            text: taskText,
+            styling: {
+              color: isCompleted ? "gray" : "white",
+              strikethrough: isCompleted,
+            },
+          },
+        ],
+      });
+    } else if (line.trim()) {
+      rows.push({
+        type: "content",
+        segments: [
+          { text: "  ", styling: {} }, // Padding
+          { text: line, styling: { color: "white" } },
+        ],
+      });
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Helper: Process Write/Edit/MultiEdit results into success message + diff rows
+ */
+function processFileEditRows(
+  toolName: string | undefined,
+  content: string,
+): ToolResultRow[] | null {
+  if (
+    !(
+      toolName === "Write" ||
+      toolName === "Edit" ||
+      toolName === "MultiEdit"
+    ) ||
+    !content.includes("Diff:\n")
+  ) {
+    return null;
+  }
+
+  const diffSection = content.split("Diff:\n")[1];
+  if (!diffSection) {
+    return null;
+  }
+
+  const rows: ToolResultRow[] = [
+    {
+      type: "header",
+      segments: [
+        { text: "⎿ ", styling: { color: "gray" } },
+        {
+          text:
+            toolName === "Edit"
+              ? " File edited successfully"
+              : toolName === "MultiEdit"
+                ? " File edited successfully"
+                : " File written successfully",
+          styling: { color: "green" },
+        },
+      ],
+    },
+  ];
+
+  const diffRows = processDiffIntoRows(diffSection);
+  rows.push(...diffRows);
+
+  return rows;
+}
+
+/**
+ * Helper: Process bash output into header + terminal output rows with truncation
+ */
+function processBashOutputRows(content: string): ToolResultRow[] {
+  const isStderr = content.startsWith("Stderr:");
+  const actualOutput = isStderr ? content.slice(7).trim() : content;
+  const outputLines = actualOutput.split("\n");
+
+  const rows: ToolResultRow[] = [
+    {
+      type: "header",
+      segments: [
+        { text: "⎿ ", styling: { color: "gray" } },
+        { text: " Terminal output:", styling: { color: "gray" } },
+      ],
+    },
+  ];
+
+  if (outputLines.length <= MAX_BASH_OUTPUT_LINES) {
+    // Show actual output for MAX_BASH_OUTPUT_LINES lines or fewer
+    for (const line of outputLines) {
+      if (line.trim()) {
+        rows.push({
+          type: "content",
+          segments: [
+            { text: "  ", styling: {} }, // Padding
+            { text: line, styling: { color: isStderr ? "red" : "white" } },
+          ],
+        });
+      }
+    }
   } else {
-    // Show first few lines and summary
-    const visibleLines = lines.slice(0, MAX_BASH_OUTPUT_LINES);
-    const hiddenCount = lines.length - MAX_BASH_OUTPUT_LINES;
-    
+    // Show first MAX_BASH_OUTPUT_LINES lines with ellipsis for more lines
+    const firstLines = outputLines.slice(0, MAX_BASH_OUTPUT_LINES);
+    for (const line of firstLines) {
+      if (line.trim()) {
+        rows.push({
+          type: "content",
+          segments: [
+            { text: "  ", styling: {} }, // Padding
+            { text: line, styling: { color: isStderr ? "red" : "white" } },
+          ],
+        });
+      }
+    }
+    rows.push({
+      type: "content",
+      segments: [
+        { text: "  ", styling: {} }, // Padding
+        {
+          text: `... +${outputLines.length - MAX_BASH_OUTPUT_LINES} lines`,
+          styling: { color: "gray" },
+        },
+      ],
+    });
+  }
+
+  return rows;
+}
+
+/**
+ * TOOL RESULT SEGMENTATION: Convert complex tool outputs into pre-styled rows
+ *
+ * Processes tool outputs upstream to prevent flickering:
+ * 1. Convert tool outputs into individual rows with pre-computed styled segments
+ * 2. Handle multi-row outputs (checklists, diffs, bash output) at this level
+ * 3. Return ToolResultRow objects that become separate MemoizedMessage components
+ * 4. Each row renders instantly with pre-styled segments
+ *
+ * Complex tool result types that create multiple rows:
+ * - Checklist: Header + checkbox rows with status indicators and strikethrough
+ * - Write/Edit diffs: Success message + diff lines with +/- styling and colors
+ * - Bash output: Header + terminal output lines (truncated if exceeds limit)
+ * - Other tools: Summary row with formatted content and path conversion
+ */
+export function processToolResultIntoRows({
+  toolName,
+  content,
+}: ToolResultSummaryProps): ToolResultRow[] {
+  if (!content) {
     return [
       {
-        type: "content",
-        segments: visibleLines.map(line => ({
-          text: `  ${line}\n`,
-          styling: { color: "white" },
-        })).flat(),
-      },
-      {
         type: "summary",
-        segments: [{
-          text: `  ... and ${hiddenCount} more line${hiddenCount === 1 ? "" : "s"}`,
-          styling: { color: "gray", italic: true },
-        }],
+        segments: [
+          { text: "⎿ ", styling: { color: "gray" } },
+          { text: " No output", styling: { color: "gray" } },
+        ],
       },
     ];
   }
-}
 
-/**
- * Process file-related tool output
- */
-function processFileOutput(content: string): ToolResultRow[] {
-  // Check if this looks like a diff
-  if (content.includes("@@") && (content.includes("+++") || content.includes("---"))) {
-    return processDiffOutput(content);
+  const displayName = toolName ? getToolDisplayName(toolName) : "Tool";
+
+  // Handle Checklist specially with styled display
+  if (toolName === "Checklist") {
+    return processChecklistRows(content);
   }
 
-  // Regular file content
-  const lines = content.split("\n");
-  return [{
-    type: "content",
-    segments: lines.map(line => ({
-      text: `  ${line}\n`,
-      styling: { color: "white" },
-    })).flat(),
-  }];
+  // Handle Write/Edit/MultiEdit with diff specially
+  const fileEditRows = processFileEditRows(toolName, content);
+  if (fileEditRows) {
+    return fileEditRows;
+  }
+
+  // Handle terminal command output specially
+  if (toolName === "Bash") {
+    return processBashOutputRows(content);
+  }
+
+  // Handle all other cases with text summary
+  const getSummary = () => {
+    // Check if this is a user cancellation first
+    if (content === "Permission denied by user") {
+      return "Cancelled by user";
+    }
+
+    // Check if it was an error
+    if (content.startsWith("Error")) {
+      const lines = content.split("\n");
+      return `Error: ${lines[0]}${lines.length > 1 ? "..." : ""}`;
+    }
+
+    // Convert absolute paths to relative paths from workspace root
+    const formatPath = (filePath: string) => {
+      if (path.isAbsolute(filePath)) {
+        const workspaceRoot = process.cwd();
+        const relativePath = path.relative(workspaceRoot, filePath);
+        return relativePath || filePath;
+      }
+      return filePath;
+    };
+
+    const lines = content.split("\n").length;
+    const chars = content.length;
+
+    // Handle specific tool output formatting
+    switch (toolName) {
+      case "Read":
+        // Try to extract file path from content if it contains line numbers
+        if (content.includes("→")) {
+          const pathMatch = content.match(/^(.+?):/);
+          const filePath = pathMatch ? pathMatch[1] : "file";
+          return `${displayName} ${formatPath(filePath)} (${lines} lines)`;
+        }
+        return `${displayName} tool output (${lines} lines)`;
+
+      case "Write":
+        return content.includes("Successfully created file")
+          ? "File created successfully"
+          : "File updated successfully";
+
+      case "Edit":
+        return "File edited successfully";
+
+      case "MultiEdit":
+        return "File edited successfully";
+
+      case "List":
+        return `Listed ${lines} ${lines === 1 ? "item" : "items"}`;
+
+      case "Search":
+        return `Found ${lines} ${lines === 1 ? "match" : "matches"}`;
+
+      case "Diff":
+        return `Diff output (${lines} lines)`;
+
+      default:
+        // Fallback for all tools using display name
+        if (chars > 1000) {
+          return `${displayName} output: ${lines} lines, ${chars} characters`;
+        } else if (lines > 10) {
+          return `${displayName} output: ${lines} lines`;
+        } else {
+          return content.slice(0, 100) + (content.length > 100 ? "..." : "");
+        }
+    }
+  };
+
+  return [
+    {
+      type: "summary",
+      segments: [
+        { text: "⎿ ", styling: { color: "gray" } },
+        { text: " " + getSummary(), styling: { color: "gray" } },
+      ],
+    },
+  ];
+}
+
+// Diff line interface (from ColoredDiff)
+interface DiffLine {
+  type: "add" | "del" | "context" | "hunk" | "other";
+  oldLine?: number;
+  newLine?: number;
+  content: string;
 }
 
 /**
- * Process diff output with syntax highlighting
+ * Parse diff content into individual lines (extracted from ColoredDiff)
  */
-function processDiffOutput(content: string): ToolResultRow[] {
-  const lines = content.split("\n");
-  const segments: StyledSegment[] = [];
-
-  let visibleLines = 0;
-  const maxLines = MAX_DIFF_LINES;
+function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
+  const lines = diffContent.split("\n");
+  const result: DiffLine[] = [];
+  let currentOldLine = 0;
+  let currentNewLine = 0;
+  let inHunk = false;
+  const hunkHeaderRegex = /^@@ -(\d+),?\d* \+(\d+),?\d* @@/;
 
   for (const line of lines) {
-    if (visibleLines >= maxLines) {
-      // Add summary of remaining lines
-      const remainingLines = lines.length - visibleLines;
-      segments.push({
-        text: `  ... and ${remainingLines} more line${remainingLines === 1 ? "" : "s"}\n`,
-        styling: { color: "gray", italic: true },
+    const hunkMatch = line.match(hunkHeaderRegex);
+    if (hunkMatch) {
+      currentOldLine = parseInt(hunkMatch[1], 10);
+      currentNewLine = parseInt(hunkMatch[2], 10);
+      inHunk = true;
+      result.push({ type: "hunk", content: line });
+      currentOldLine--;
+      currentNewLine--;
+      continue;
+    }
+    if (!inHunk) {
+      if (
+        line.startsWith("--- ") ||
+        line.startsWith("+++ ") ||
+        line.startsWith("diff --git") ||
+        line.startsWith("index ")
+      )
+        continue;
+      continue;
+    }
+    if (line.startsWith("+")) {
+      currentNewLine++;
+      result.push({
+        type: "add",
+        newLine: currentNewLine,
+        content: line.substring(1),
       });
-      break;
+    } else if (line.startsWith("-")) {
+      currentOldLine++;
+      result.push({
+        type: "del",
+        oldLine: currentOldLine,
+        content: line.substring(1),
+      });
+    } else if (line.startsWith(" ")) {
+      currentOldLine++;
+      currentNewLine++;
+      result.push({
+        type: "context",
+        oldLine: currentOldLine,
+        newLine: currentNewLine,
+        content: line.substring(1),
+      });
+    } else if (line.startsWith("\\")) {
+      result.push({ type: "other", content: line });
     }
+  }
+  return result;
+}
 
-    let styling: StyledSegment["styling"] = { color: "white" };
+/**
+ * Process diff content into individual row segments
+ */
+function processDiffIntoRows(diffContent: string): ToolResultRow[] {
+  const parsedLines = parseDiffWithLineNumbers(diffContent);
 
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      styling = { backgroundColor: DIFF_COLORS.ADDITION_BG };
-    } else if (line.startsWith("-") && !line.startsWith("---")) {
-      styling = { backgroundColor: DIFF_COLORS.DELETION_BG };
-    } else if (line.startsWith("@@")) {
-      styling = { color: DIFF_COLORS.LINE_NUMBER };
-    }
-
-    segments.push({
-      text: `  ${line}\n`,
-      styling,
-    });
-
-    visibleLines++;
+  if (parsedLines.length === 0) {
+    return [
+      {
+        type: "content",
+        segments: [
+          { text: "No changes detected.", styling: { color: "gray" } },
+        ],
+      },
+    ];
   }
 
-  return [{ type: "content", segments }];
-}
+  const displayableLines = parsedLines.filter(
+    (l) => l.type !== "hunk" && l.type !== "other",
+  );
 
-/**
- * Process search tool output (Grep, Glob)
- */
-function processSearchOutput(content: string): ToolResultRow[] {
-  const lines = content.split("\n").filter(line => line.trim());
-  
-  return [{
-    type: "content",
-    segments: lines.map((line, index) => ({
-      text: `  ${line}${index === lines.length - 1 ? "" : "\n"}`,
-      styling: { color: "white" },
-    })).flat(),
-  }];
-}
+  const truncatedLines = displayableLines.slice(0, MAX_DIFF_LINES);
+  const isTruncated = displayableLines.length > MAX_DIFF_LINES;
 
-/**
- * Process generic tool output
- */
-function processGenericOutput(content: string): ToolResultRow[] {
-  return [{
-    type: "content",
-    segments: [{
-      text: `  ${content}`,
-      styling: { color: "white" },
-    }],
-  }];
+  const rows: ToolResultRow[] = [];
+
+  // Process each diff line into a separate row
+  for (const line of truncatedLines) {
+    let gutterNumStr = "";
+    let prefixSymbol = " ";
+    let textColor: string = "white";
+    let backgroundColor: string | undefined = undefined;
+
+    switch (line.type) {
+      case "add":
+        gutterNumStr = (line.newLine ?? "").toString();
+        backgroundColor = DIFF_COLORS.ADDITION_BG;
+        prefixSymbol = "+";
+        textColor = "white";
+        break;
+      case "del":
+        gutterNumStr = (line.oldLine ?? "").toString();
+        backgroundColor = DIFF_COLORS.DELETION_BG;
+        prefixSymbol = "-";
+        textColor = "white";
+        break;
+      case "context":
+        gutterNumStr = (line.newLine ?? "").toString();
+        textColor = "gray";
+        prefixSymbol = " ";
+        break;
+      default:
+        continue;
+    }
+
+    rows.push({
+      type: "content",
+      segments: [
+        {
+          text: gutterNumStr.padEnd(4) + " ",
+          styling: { color: DIFF_COLORS.LINE_NUMBER },
+        },
+        {
+          text: prefixSymbol + " ",
+          styling: { color: textColor, backgroundColor },
+        },
+        {
+          text: line.content,
+          styling: { color: textColor, backgroundColor },
+        },
+      ],
+    });
+  }
+
+  // Add truncation indicator if needed
+  if (isTruncated) {
+    rows.push({
+      type: "content",
+      segments: [
+        {
+          text: `... (${displayableLines.length - MAX_DIFF_LINES} more lines)`,
+          styling: { color: "gray" },
+        },
+      ],
+    });
+  }
+
+  return rows;
 }

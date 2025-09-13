@@ -17,7 +17,6 @@ import { messageQueue, QueuedMessage } from "../../stream/messageQueue.js";
 import { telemetryService } from "../../telemetry/telemetryService.js";
 import { formatError } from "../../util/formatError.js";
 import { logger } from "../../util/logger.js";
-import { processHistoryToMessageRows } from "../processors/messageProcessor.js";
 
 import {
   handleAutoCompaction,
@@ -790,14 +789,8 @@ export function useChat({
     }
   };
 
-  // Convert ChatHistoryItem[] to MessageRow[] for UI rendering
-  const messageRows = React.useMemo(() => {
-    return processHistoryToMessageRows(chatHistory, terminalWidth);
-  }, [chatHistory, terminalWidth]);
-
   return {
-    chatHistory: messageRows, // Return MessageRow[] for UI components
-    rawChatHistory: chatHistory, // Keep raw format for internal use
+    chatHistory, // Return ChatHistoryItem[] for original architecture
     setChatHistory: setChatHistory,
     isWaitingForResponse,
     responseStartTime,

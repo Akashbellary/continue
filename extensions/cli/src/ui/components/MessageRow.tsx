@@ -20,10 +20,15 @@ export function MessageRowComponent({
 }): React.ReactElement {
   return (
     <Box marginBottom={row.marginBottom}>
-      <Text color={row.role === "user" ? "blue" : "white"}>
-        {row.showBullet ? "●" : " "}
-      </Text>
-      <Text> </Text>
+      {/* Only render bullet area for user/assistant messages, not tool results */}
+      {row.role !== "tool-result" && (
+        <>
+          <Text color={row.role === "user" ? "blue" : "white"}>
+            {row.showBullet ? "●" : " "}
+          </Text>
+          <Text> </Text>
+        </>
+      )}
       <StyledSegmentRenderer segments={row.segments} />
     </Box>
   );

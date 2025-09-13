@@ -92,9 +92,9 @@ describe("messageProcessor", () => {
     expect(assistantRows.length).toBeGreaterThanOrEqual(1);
 
     // Check that each user message group has correct bullet/margin pattern
-    let currentUserGroup = 0;
-    let rowsInCurrentGroup = 0;
-    let userGroupStarts: number[] = [];
+    const currentUserGroup = 0;
+    const rowsInCurrentGroup = 0;
+    const userGroupStarts: number[] = [];
     
     // Find where each user message group starts
     for (let i = 0; i < messageRows.length; i++) {
