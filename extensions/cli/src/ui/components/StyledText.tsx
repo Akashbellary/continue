@@ -8,10 +8,10 @@ import type { StyledSegment } from "../types/messageTypes.js";
  * Renders styled segments with unified formatting
  * Replaces StyledSegmentRenderer from MarkdownProcessor.tsx
  */
-export function StyledSegmentRenderer({ 
-  segments 
-}: { 
-  segments: StyledSegment[] 
+export function StyledSegmentRenderer({
+  segments,
+}: {
+  segments: StyledSegment[];
 }): React.ReactElement {
   return (
     <>
@@ -20,11 +20,13 @@ export function StyledSegmentRenderer({
 
         // Handle code blocks with syntax highlighting
         if (styling.codeLanguage) {
-          const highlightedElements = highlightCode(text, styling.codeLanguage, defaultTheme);
+          const highlightedElements = highlightCode(
+            text,
+            styling.codeLanguage,
+            defaultTheme,
+          );
           return (
-            <React.Fragment key={index}>
-              {highlightedElements}
-            </React.Fragment>
+            <React.Fragment key={index}>{highlightedElements}</React.Fragment>
           );
         }
 

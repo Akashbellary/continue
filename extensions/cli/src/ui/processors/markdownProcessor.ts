@@ -55,7 +55,7 @@ export function processMarkdownToSegments(
   if (!text) {
     return [];
   }
-  
+
   const segments: StyledSegment[] = [];
   let currentIndex = 0;
 
@@ -112,14 +112,17 @@ export function processMarkdownToSegments(
   });
 
   // Sort matches by index
-  const sortedMatches = [...allMatches, ...codeBlocks.map(block => ({
-    index: block.index,
-    length: block.length,
-    segment: {
-      text: block.code,
-      styling: { codeLanguage: block.language },
-    },
-  }))].sort((a, b) => a.index - b.index);
+  const sortedMatches = [
+    ...allMatches,
+    ...codeBlocks.map((block) => ({
+      index: block.index,
+      length: block.length,
+      segment: {
+        text: block.code,
+        styling: { codeLanguage: block.language },
+      },
+    })),
+  ].sort((a, b) => a.index - b.index);
 
   // Build segments by processing matches and plain text in order
   sortedMatches.forEach((match) => {
@@ -177,7 +180,10 @@ export function splitStyledSegmentsIntoRows(
       const wordWidth = word.length;
 
       // Check if adding this word would exceed terminal width
-      if (currentRowWidth + wordWidth > terminalWidth && currentRow.length > 0) {
+      if (
+        currentRowWidth + wordWidth > terminalWidth &&
+        currentRow.length > 0
+      ) {
         // Start a new row
         rows.push(currentRow);
         currentRow = [];
@@ -185,7 +191,10 @@ export function splitStyledSegmentsIntoRows(
       }
 
       // Add word to current row
-      if (currentRow.length === 0 || currentRow[currentRow.length - 1].styling !== segment.styling) {
+      if (
+        currentRow.length === 0 ||
+        currentRow[currentRow.length - 1].styling !== segment.styling
+      ) {
         // Create new segment if this is the first segment or styling is different
         currentRow.push({
           text: word,

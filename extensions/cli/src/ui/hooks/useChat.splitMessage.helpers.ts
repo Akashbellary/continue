@@ -1,22 +1,17 @@
-import type {
-  ChatHistoryItem,
-  MessageContent,
-} from "core/index.js";
+import type { ChatHistoryItem, MessageContent } from "core/index.js";
 
 import {
   processMarkdownToSegments,
   splitStyledSegmentsIntoRows,
   StyledSegment,
 } from "../MarkdownProcessor.js";
-import {
-  ToolResultRow,
-} from "../ToolResultProcessor.js";
+import { ToolResultRow } from "../ToolResultProcessor.js";
 
 import { breakTextIntoRows } from "./useChat.splitLines.helpers.js";
 
 /**
  * Extended chat item type that supports anti-flickering row-based rendering
- * 
+ *
  * splitMessage: Tracks position when long messages are split across rows
  * styledSegments: Pre-computed text+styling, eliminates markdown processing in MemoizedMessage
  * toolResultRow: Single tool result row with pre-styled segments, replaces nested components
@@ -40,13 +35,13 @@ export type ChatHistoryItemWithSplit = ChatHistoryItem & {
 
 /**
  * CORE TEXT SPLITTING: Convert large messages into terminal-width rows with styled segments
- * 
+ *
  * Anti-flickering text processing:
  * 1. Process markdown content into styled segments (text + color/formatting)
  * 2. Split segments across rows that fit the terminal width
  * 3. Create separate ChatHistoryItem for each row with pre-computed styledSegments
  * 4. MemoizedMessage renders single rows instantly without markdown processing
- * 
+ *
  * Word wrapping preserves markdown formatting while ensuring each row fits the terminal.
  * Multiple styling within one row is supported through segment arrays.
  */
@@ -155,5 +150,3 @@ export function splitMessageContent(
     }));
   }
 }
-
-

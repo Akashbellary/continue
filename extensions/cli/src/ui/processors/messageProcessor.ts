@@ -3,12 +3,18 @@ import type { ChatHistoryItem, MessageContent } from "core/index.js";
 import { breakTextIntoRows } from "../hooks/useChat.splitLines.helpers.js";
 import type { MessageRow, StyledSegment } from "../types/messageTypes.js";
 
-import { processMarkdownToSegments, splitStyledSegmentsIntoRows } from "./markdownProcessor.js";
-import { processToolResultIntoRows, getToolCallTitleSegments } from "./toolResultProcessor.js";
+import {
+  processMarkdownToSegments,
+  splitStyledSegmentsIntoRows,
+} from "./markdownProcessor.js";
+import {
+  processToolResultIntoRows,
+  getToolCallTitleSegments,
+} from "./toolResultProcessor.js";
 
 /**
  * Convert all chat history to unified MessageRow format
- * 
+ *
  * This replaces processHistoryForTerminalDisplay and creates the unified
  * MessageRow architecture where everything is rendered through segments.
  */
@@ -24,7 +30,10 @@ export function processHistoryToMessageRows(
       messageRows.push(...userRows);
     } else if (item.message.role === "assistant") {
       if (item.toolCallStates && item.toolCallStates.length > 0) {
-        const assistantWithToolRows = processAssistantWithToolCalls(item, terminalWidth);
+        const assistantWithToolRows = processAssistantWithToolCalls(
+          item,
+          terminalWidth,
+        );
         messageRows.push(...assistantWithToolRows);
       } else {
         const assistantRows = processAssistantMessage(item, terminalWidth);
@@ -42,12 +51,15 @@ export function processHistoryToMessageRows(
 /**
  * Process user messages into MessageRow format
  */
-function processUserMessage(item: ChatHistoryItem, terminalWidth: number): MessageRow[] {
+function processUserMessage(
+  item: ChatHistoryItem,
+  terminalWidth: number,
+): MessageRow[] {
   const content = processMessageContent(item.message.content);
-  
+
   // Simple text splitting for user messages (no markdown processing)
   const textRows = breakTextIntoRows(content, terminalWidth);
-  
+
   return textRows.map((text, index) => ({
     role: "user" as const,
     rowType: "content" as const,
@@ -60,13 +72,19 @@ function processUserMessage(item: ChatHistoryItem, terminalWidth: number): Messa
 /**
  * Process assistant messages into MessageRow format
  */
-function processAssistantMessage(item: ChatHistoryItem, terminalWidth: number): MessageRow[] {
+function processAssistantMessage(
+  item: ChatHistoryItem,
+  terminalWidth: number,
+): MessageRow[] {
   const content = processMessageContent(item.message.content);
-  
+
   // Process markdown into styled segments then split into rows
   const styledSegments = processMarkdownToSegments(content);
-  const segmentRows = splitStyledSegmentsIntoRows(styledSegments, terminalWidth);
-  
+  const segmentRows = splitStyledSegmentsIntoRows(
+    styledSegments,
+    terminalWidth,
+  );
+
   return segmentRows.map((segments, index) => ({
     role: "assistant" as const,
     rowType: "content" as const,
@@ -79,12 +97,15 @@ function processAssistantMessage(item: ChatHistoryItem, terminalWidth: number): 
 /**
  * Process system messages into MessageRow format
  */
-function processSystemMessage(item: ChatHistoryItem, terminalWidth: number): MessageRow[] {
+function processSystemMessage(
+  item: ChatHistoryItem,
+  terminalWidth: number,
+): MessageRow[] {
   const content = processMessageContent(item.message.content);
-  
+
   // Simple text splitting for system messages
   const textRows = breakTextIntoRows(content, terminalWidth);
-  
+
   return textRows.map((text, index) => ({
     role: "system" as const,
     rowType: "content" as const,
@@ -97,7 +118,10 @@ function processSystemMessage(item: ChatHistoryItem, terminalWidth: number): Mes
 /**
  * Process assistant messages with tool calls into MessageRow format
  */
-function processAssistantWithToolCalls(item: ChatHistoryItem, terminalWidth: number): MessageRow[] {
+function processAssistantWithToolCalls(
+  item: ChatHistoryItem,
+  terminalWidth: number,
+): MessageRow[] {
   const messageRows: MessageRow[] = [];
 
   // First, add any assistant message content
@@ -129,7 +153,8 @@ function createToolCallHeaderRow(toolState: any): MessageRow {
   const toolName = toolState.toolCall.function.name;
   const toolArgs = toolState.parsedArgs;
   const isCompleted = toolState.status === "done";
-  const isErrored = toolState.status === "errored" || toolState.status === "canceled";
+  const isErrored =
+    toolState.status === "errored" || toolState.status === "canceled";
 
   const statusSegments: StyledSegment[] = [
     {
@@ -170,26 +195,29 @@ function createToolOutputRows(toolState: any): MessageRow[] {
   }
 
   const toolName = toolState.toolCall.function.name;
-  const isErrored = toolState.status === "errored" || toolState.status === "canceled";
+  const isErrored =
+    toolState.status === "errored" || toolState.status === "canceled";
 
   if (isErrored) {
-    return [{
-      role: "tool-result" as const,
-      rowType: "content" as const,
-      segments: [
-        { text: "  ", styling: {} }, // Indentation
-        {
-          text: toolState.output[0].content ?? "Tool execution failed",
-          styling: { color: "red" },
+    return [
+      {
+        role: "tool-result" as const,
+        rowType: "content" as const,
+        segments: [
+          { text: "  ", styling: {} }, // Indentation
+          {
+            text: toolState.output[0].content ?? "Tool execution failed",
+            styling: { color: "red" },
+          },
+        ],
+        showBullet: false,
+        marginBottom: 1, // Add margin after error output
+        toolMeta: {
+          toolCallId: toolState.toolCallId,
+          toolName,
         },
-      ],
-      showBullet: false,
-      marginBottom: 1, // Add margin after error output
-      toolMeta: {
-        toolCallId: toolState.toolCallId,
-        toolName,
       },
-    }];
+    ];
   }
 
   // Process successful tool output

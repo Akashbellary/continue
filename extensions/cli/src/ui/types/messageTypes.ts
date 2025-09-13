@@ -16,7 +16,7 @@ export interface StyledSegment {
 
 /**
  * Unified MessageRow type - single structure for all message rendering
- * 
+ *
  * Replaces the complex ChatHistoryItemWithSplit with optional fields.
  * All message types (user, assistant, tool results) are converted to this format.
  */
@@ -24,14 +24,14 @@ export type MessageRow = {
   // Row metadata
   role: "user" | "assistant" | "system" | "tool-result";
   rowType: "content" | "header" | "summary";
-  
+
   // Unified rendering data - always use segments for rendering
   segments: StyledSegment[];
-  
+
   // Visual formatting
-  showBullet: boolean;  // Show ● indicator
+  showBullet: boolean; // Show ● indicator
   marginBottom: number; // 0 for continuation rows, 1 for last row
-  
+
   // Optional tool metadata (only for tool result rows)
   toolMeta?: {
     toolCallId: string;
