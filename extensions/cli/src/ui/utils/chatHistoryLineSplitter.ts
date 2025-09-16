@@ -22,17 +22,17 @@ export interface ChatHistoryLine extends Omit<ChatHistoryItem, 'message'> {
  */
 function createInvisibleRenderer(item: ChatHistoryItem, index: number, terminalWidth: number) {
   // Debug tool output content to see if we have diff data
-  if (item.toolCallStates?.length) {
-    item.toolCallStates.forEach((toolState, i) => {
-      const output = toolState.output?.map(o => o.content).join('\n') || '';
-      console.log(`[DEBUG] Tool ${i} (${toolState.toolCall.function.name}) output length:`, output.length);
-      console.log(`[DEBUG] Tool ${i} contains "Diff:":`, output.includes('Diff:\n'));
-      if (output.includes('Diff:\n')) {
-        const diffSection = output.split('Diff:\n')[1];
-        console.log(`[DEBUG] Diff section preview:`, diffSection?.slice(0, 200));
-      }
-    });
-  }
+  // if (item.toolCallStates?.length) {
+  //   item.toolCallStates.forEach((toolState, i) => {
+  //     const output = toolState.output?.map(o => o.content).join('\n') || '';
+  //     console.log(`[DEBUG] Tool ${i} (${toolState.toolCall.function.name}) output length:`, output.length);
+  //     console.log(`[DEBUG] Tool ${i} contains "Diff:":`, output.includes('Diff:\n'));
+  //     if (output.includes('Diff:\n')) {
+  //       const diffSection = output.split('Diff:\n')[1];
+  //       console.log(`[DEBUG] Diff section preview:`, diffSection?.slice(0, 200));
+  //     }
+  //   });
+  // }
   
   return React.createElement(Box, { width: terminalWidth, flexDirection: 'column' },
     React.createElement(MemoizedMessage, { item, index })
@@ -79,18 +79,25 @@ async function renderToAnsiStream(item: ChatHistoryItem, index: number, terminal
           }
           
           // Check what raw data was captured
-          const rawOutput = (ansiStream as any).rawOutput || '';
-          console.log('[DEBUG] Raw ANSI stream data length:', rawOutput.length);
-          console.log('[DEBUG] Raw ANSI stream preview:', JSON.stringify(rawOutput.slice(0, 200)));
-          console.log('[DEBUG] Raw ANSI stream end:', JSON.stringify(rawOutput.slice(-200)));
+          // const rawOutput = (ansiStream as any).rawOutput || '';
+          
+          // Only log if we see RGB color codes (indicating diff content)
+          // if (rawOutput.includes('48;2;')) {
+          //   console.log('[DEBUG] Diff detected - Raw ANSI length:', rawOutput.length);
+          //   console.log('[DEBUG] Lines with RGB colors:', rawOutput.split('\n').filter((line: string) => line.includes('48;2;')).length);
+          // }
           
           const lines = ansiStream.getFormattedLines();
-          console.log(`[DEBUG] Parsed ${lines.length} lines from ANSI stream`);
-          console.log('[DEBUG] Sample lines:', lines.slice(0, 3).map(l => ({
-            line: l.line,
-            content: l.segments.map(s => s.text).join(''),
-            segments: l.segments.length
-          })));
+          
+          // Only log if we have RGB styled lines
+          // const rgbLines = lines.filter(l => l.segments.some(s => s.style.backgroundColor?.startsWith('rgb(')));
+          // if (rgbLines.length > 0) {
+          //   console.log(`[DEBUG] Found ${rgbLines.length} lines with RGB backgrounds`);
+          //   console.log('[DEBUG] First RGB line:', rgbLines[0].segments.map(s => ({
+          //     text: s.text,
+          //     bg: s.style.backgroundColor
+          //   })));
+          // }
           
           ansiStream.reset(); // Clean up for next use
           resolve(lines);
@@ -117,21 +124,10 @@ export async function splitChatHistoryItemIntoLines(
     return [];
   }
 
-  const contentStr = typeof item.message.content === 'string' 
-    ? item.message.content 
-    : JSON.stringify(item.message.content);
 
   try {
-    // console.log(`[DEBUG] Processing message ${originalIndex}:`, JSON.stringify(contentStr.slice(0, 100)));
-    
     // Render complete item (including tool calls) to invisible ANSI stream to get styling information
     const styledLines = await renderToAnsiStream(item, originalIndex, terminalWidth - 4); // Account for padding/border
-    
-    // console.log(`[DEBUG] Rendered to ${styledLines.length} styled lines:`, styledLines.map(l => ({
-    //   line: l.line,
-    //   segments: l.segments.length,
-    //   content: l.segments.map(s => s.text).join('')
-    // })));
     
     // Convert styled lines to ChatHistoryLine items
     const result: ChatHistoryLine[] = [];
@@ -147,11 +143,6 @@ export async function splitChatHistoryItemIntoLines(
         continue;
       }
       
-      // console.log(`[DEBUG] Line ${lineIndex}: "${lineContent}" with ${styledLine.segments.length} segments`);
-      // styledLine.segments.forEach((seg, i) => {
-      //   console.log(`  Segment ${i}: "${seg.text}" style:`, seg.style);
-      // });
-      
       result.push({
         ...item,
         message: {
@@ -166,11 +157,8 @@ export async function splitChatHistoryItemIntoLines(
     
     // If no lines were produced, return empty array - no fallback
     if (result.length === 0) {
-      // console.log('[DEBUG] No lines produced, returning empty array');
       return [];
     }
-    
-    // console.log(`[DEBUG] Final result: ${result.length} line-based items`);
     return result;
   } catch (error) {
     console.error('Failed to split chat history item into lines:', error);
