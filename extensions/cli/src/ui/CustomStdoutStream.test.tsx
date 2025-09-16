@@ -94,6 +94,14 @@ class AnsiParsingStream extends Writable {
             style: { ...this.currentStyle },
           });
           currentText = "";
+        } else {
+          // Create empty segment for blank lines
+          this.segments.push({
+            text: "",
+            position: { row: currentRow, col: 0 },
+            endPosition: { row: currentRow, col: 0 },
+            style: { ...this.currentStyle },
+          });
         }
 
         currentRow++;
@@ -360,5 +368,32 @@ describe("AnsiParsingStream", () => {
     );
     expect(redBgSegment).toBeDefined();
     expect(redBgSegment?.text).toBe("Red BG");
+  });
+
+  test('should preserve blank lines and newlines correctly', () => {
+    const ansiStream = new AnsiParsingStream();
+    
+    // Write text with blank lines
+    const testData = 'First line\n\nSecond line after blank\n\n\nThird line after two blanks';
+    ansiStream.write(testData);
+    
+    const lines = ansiStream.getFormattedLines();
+    
+    console.log('Blank line test - formatted lines:', lines);
+    console.log('Raw test data:', JSON.stringify(testData));
+    
+    // Should capture all lines including blank ones
+    expect(lines.length).toBe(6); // 3 content lines + 3 blank lines
+    
+    // Check line contents
+    expect(lines[0].segments[0].text).toBe('First line');
+    expect(lines[1].segments.length).toBe(1); // Blank line has empty segment
+    expect(lines[1].segments[0].text).toBe(''); // Empty segment
+    expect(lines[2].segments[0].text).toBe('Second line after blank');
+    expect(lines[3].segments.length).toBe(1); // Blank line has empty segment
+    expect(lines[3].segments[0].text).toBe(''); // Empty segment
+    expect(lines[4].segments.length).toBe(1); // Blank line has empty segment  
+    expect(lines[4].segments[0].text).toBe(''); // Empty segment
+    expect(lines[5].segments[0].text).toBe('Third line after two blanks');
   });
 });

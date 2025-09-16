@@ -104,6 +104,14 @@ export class AnsiParsingStream extends Writable {
             style: { ...this.currentStyle }
           });
           currentText = '';
+        } else {
+          // Create empty segment for blank lines
+          this.segments.push({
+            text: '',
+            position: { row: currentRow, col: 0 },
+            endPosition: { row: currentRow, col: 0 },
+            style: { ...this.currentStyle }
+          });
         }
         
         currentRow++;

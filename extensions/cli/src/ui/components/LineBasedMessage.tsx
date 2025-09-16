@@ -33,22 +33,15 @@ export const LineBasedMessage = memo<LineBasedMessageProps>(
       );
     }
 
-    // Handle regular messages - let ANSI stream provide all formatting
-    // Add spacing before:
-    // 1. First line of each new original message
-    // 2. Lines that start with ● (new sections within same message, like tool calls)
-    const shouldAddSpacing =
-      (item.lineIndex === 0 && item.originalIndex > 0) ||
-      (item.lineIndex > 0 && message.content.trim().startsWith('●'));
-
+    // Handle regular messages - let ANSI stream provide all formatting including spacing
     return (
-      <Box key={index} marginTop={shouldAddSpacing ? 1 : 0}>
+      <Box key={index}>
         {/* DEBUG: Add X prefix to every other line */}
         {/* {index % 2 === 1 && <Text color="red">X </Text>} */}
 
         {/* Render content with styling if available - all formatting comes from ANSI stream */}
-        {message.content.trim() === '' ? (
-          // Render blank lines as empty space
+        {message.content === '' ? (
+          // Render blank lines as empty space (blank lines now have empty segments)
           <Text> </Text>
         ) : styledSegments && styledSegments.length > 0 ? (
           // Use ANSI-parsed styling information

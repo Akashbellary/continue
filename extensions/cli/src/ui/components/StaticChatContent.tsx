@@ -38,7 +38,6 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
   // State for managing static refresh with key-based remounting
   const [staticKey, setStaticKey] = useState(0);
   const [lineChatHistory, setLineChatHistory] = useState<ChatHistoryLine[]>([]);
-  const [isProcessingLines, setIsProcessingLines] = useState(false);
   const isInitialMount = useRef(true);
 
   // Refresh function that clears terminal and remounts Static component
@@ -51,35 +50,29 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
   // Convert chat history to line-based format
   useEffect(() => {
     let isCancelled = false;
-    setIsProcessingLines(true);
-
+    
     const convertToLines = async () => {
       try {
-        // console.log('[DEBUG] StaticChatContent: Starting line conversion');
-        // console.log('[DEBUG] Raw chat history items:', chatHistory.length);
-        
         // Filter out system messages without content
         const filteredChatHistory = chatHistory.filter(
           (item) => item.message.role !== "system" || item.message.content,
         );
 
-        // console.log('[DEBUG] Filtered chat history items:', filteredChatHistory.length);
-        // console.log('[DEBUG] Terminal columns:', columns);
+        // Only process if we have new content
+        if (filteredChatHistory.length === 0) {
+          setLineChatHistory([]);
+          return;
+        }
 
         const lines = await splitChatHistoryIntoLines(filteredChatHistory, columns);
         
-        // console.log('[DEBUG] Total line-based items created:', lines.length);
-        
         if (!isCancelled) {
           setLineChatHistory(lines);
-          setIsProcessingLines(false);
         }
       } catch (error) {
         console.error('Failed to convert chat history to lines:', error);
         if (!isCancelled) {
-          // No fallback - keep empty array to force proper line-based rendering
           setLineChatHistory([]);
-          setIsProcessingLines(false);
         }
       }
     };
@@ -132,15 +125,15 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
       );
     }
 
-    if (isProcessingLines) {
-      // Show loading indicator while processing
-      staticItems.push(
-        <Box key="processing" paddingLeft={2}>
-          <Text color="gray" italic>Processing chat history...</Text>
-        </Box>
-      );
-      return { staticItems, pendingItems: [] };
-    }
+    // Remove processing indicator to prevent screen clearing
+    // if (isProcessingLines) {
+    //   staticItems.push(
+    //     <Box key="processing" paddingLeft={2}>
+    //       <Text color="gray" italic>Processing chat history...</Text>
+    //     </Box>
+    //   );
+    //   return { staticItems, pendingItems: [] };
+    // }
 
     const PENDING_ITEMS_COUNT = 1;
     const stableCount = Math.max(0, lineChatHistory.length - PENDING_ITEMS_COUNT);
@@ -163,7 +156,6 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
     model,
     mcpService,
     lineChatHistory,
-    isProcessingLines,
     renderLineBasedMessage,
   ]);
 
