@@ -196,6 +196,20 @@ export class AnsiParsingStream extends Writable {
             this.currentStyle.color = this.getColorName(num - 30);
           } else if (num >= 40 && num <= 47) {
             this.currentStyle.backgroundColor = this.getColorName(num - 40);
+          } else if (num === 38) {
+            // Extended foreground color
+            const colorInfo = this.parseExtendedColor(codes, i);
+            if (colorInfo) {
+              this.currentStyle.color = colorInfo.color;
+              i = colorInfo.nextIndex;
+            }
+          } else if (num === 48) {
+            // Extended background color
+            const colorInfo = this.parseExtendedColor(codes, i);
+            if (colorInfo) {
+              this.currentStyle.backgroundColor = colorInfo.color;
+              i = colorInfo.nextIndex;
+            }
           } else if (num === 39) {
             this.currentStyle.color = null;
           } else if (num === 49) {
@@ -204,6 +218,34 @@ export class AnsiParsingStream extends Writable {
           break;
       }
     }
+  }
+
+  parseExtendedColor(codes: number[], currentIndex: number) {
+    if (currentIndex + 1 >= codes.length) return null;
+    
+    const colorType = codes[currentIndex + 1];
+    
+    if (colorType === 5) {
+      // 256-color mode
+      if (currentIndex + 2 >= codes.length) return null;
+      const colorIndex = codes[currentIndex + 2];
+      return {
+        color: `ansi256-${colorIndex}`,
+        nextIndex: currentIndex + 2
+      };
+    } else if (colorType === 2) {
+      // RGB mode
+      if (currentIndex + 4 >= codes.length) return null;
+      const r = codes[currentIndex + 2];
+      const g = codes[currentIndex + 3];
+      const b = codes[currentIndex + 4];
+      return {
+        color: `rgb(${r},${g},${b})`,
+        nextIndex: currentIndex + 4
+      };
+    }
+    
+    return null;
   }
 
   getColorName(colorIndex: number): string {

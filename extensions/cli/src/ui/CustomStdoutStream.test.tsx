@@ -192,6 +192,20 @@ class AnsiParsingStream extends Writable {
             this.currentStyle.color = this.getColorName(num - 30);
           } else if (num >= 40 && num <= 47) {
             this.currentStyle.backgroundColor = this.getColorName(num - 40);
+          } else if (num === 38) {
+            // Extended foreground color
+            const colorInfo = this.parseExtendedColor(codes, i);
+            if (colorInfo) {
+              this.currentStyle.color = colorInfo.color;
+              i = colorInfo.nextIndex;
+            }
+          } else if (num === 48) {
+            // Extended background color
+            const colorInfo = this.parseExtendedColor(codes, i);
+            if (colorInfo) {
+              this.currentStyle.backgroundColor = colorInfo.color;
+              i = colorInfo.nextIndex;
+            }
           } else if (num === 39) {
             this.currentStyle.color = null;
           } else if (num === 49) {
@@ -200,6 +214,34 @@ class AnsiParsingStream extends Writable {
           break;
       }
     }
+  }
+
+  parseExtendedColor(codes: number[], currentIndex: number) {
+    if (currentIndex + 1 >= codes.length) return null;
+    
+    const colorType = codes[currentIndex + 1];
+    
+    if (colorType === 5) {
+      // 256-color mode
+      if (currentIndex + 2 >= codes.length) return null;
+      const colorIndex = codes[currentIndex + 2];
+      return {
+        color: `ansi256-${colorIndex}`,
+        nextIndex: currentIndex + 2
+      };
+    } else if (colorType === 2) {
+      // RGB mode
+      if (currentIndex + 4 >= codes.length) return null;
+      const r = codes[currentIndex + 2];
+      const g = codes[currentIndex + 3];
+      const b = codes[currentIndex + 4];
+      return {
+        color: `rgb(${r},${g},${b})`,
+        nextIndex: currentIndex + 4
+      };
+    }
+    
+    return null;
   }
 
   getColorName(colorIndex: number): string {
@@ -395,5 +437,34 @@ describe("AnsiParsingStream", () => {
     expect(lines[4].segments.length).toBe(1); // Blank line has empty segment  
     expect(lines[4].segments[0].text).toBe(''); // Empty segment
     expect(lines[5].segments[0].text).toBe('Third line after two blanks');
+  });
+
+  test('should parse RGB colors correctly', () => {
+    const ansiStream = new AnsiParsingStream();
+    
+    // Write RGB ANSI codes like we see in the diff output
+    const testData = '\x1b[48;2;113;47;55m\x1b[38;2;167;94;109mRed BG Text\x1b[49m\x1b[39m \x1b[48;2;50;91;48m\x1b[38;2;89;164;103mGreen BG Text\x1b[49m\x1b[39m';
+    ansiStream.write(testData);
+    
+    const lines = ansiStream.getFormattedLines();
+    
+    console.log('RGB test segments:', lines[0].segments.map(s => ({
+      text: s.text,
+      color: s.style.color,
+      backgroundColor: s.style.backgroundColor
+    })));
+    
+    expect(lines.length).toBe(1);
+    const segments = lines[0].segments;
+    
+    // Should have segments with RGB colors
+    expect(segments.length).toBeGreaterThan(1);
+    
+    // Check for RGB background colors
+    const redBgSegment = segments.find(s => s.style.backgroundColor?.includes('113,47,55'));
+    const greenBgSegment = segments.find(s => s.style.backgroundColor?.includes('50,91,48'));
+    
+    expect(redBgSegment).toBeDefined();
+    expect(greenBgSegment).toBeDefined();
   });
 });

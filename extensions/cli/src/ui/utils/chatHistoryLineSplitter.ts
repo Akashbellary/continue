@@ -208,8 +208,37 @@ export function createStyledTextFromSegments(segments: StyledSegment[]): React.R
     if (segment.style.strikethrough) props.strikethrough = true;
     if (segment.style.dim) props.dimColor = true;
     if (segment.style.inverse) props.inverse = true;
-    if (segment.style.color) props.color = segment.style.color;
-    if (segment.style.backgroundColor) props.backgroundColor = segment.style.backgroundColor;
+    
+    // Handle colors - convert RGB back to Ink-compatible format
+    if (segment.style.color) {
+      if (segment.style.color.startsWith('rgb(')) {
+        // RGB colors - Ink can handle hex colors, so convert rgb(r,g,b) to #hex
+        const match = segment.style.color.match(/rgb\((\d+),(\d+),(\d+)\)/);
+        if (match) {
+          const r = parseInt(match[1]).toString(16).padStart(2, '0');
+          const g = parseInt(match[2]).toString(16).padStart(2, '0');
+          const b = parseInt(match[3]).toString(16).padStart(2, '0');
+          props.color = `#${r}${g}${b}`;
+        }
+      } else {
+        props.color = segment.style.color;
+      }
+    }
+    
+    if (segment.style.backgroundColor) {
+      if (segment.style.backgroundColor.startsWith('rgb(')) {
+        // RGB background colors
+        const match = segment.style.backgroundColor.match(/rgb\((\d+),(\d+),(\d+)\)/);
+        if (match) {
+          const r = parseInt(match[1]).toString(16).padStart(2, '0');
+          const g = parseInt(match[2]).toString(16).padStart(2, '0');
+          const b = parseInt(match[3]).toString(16).padStart(2, '0');
+          props.backgroundColor = `#${r}${g}${b}`;
+        }
+      } else {
+        props.backgroundColor = segment.style.backgroundColor;
+      }
+    }
     
     return React.createElement(Text, props, segment.text);
   });
