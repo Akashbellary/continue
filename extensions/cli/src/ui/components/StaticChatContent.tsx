@@ -55,20 +55,20 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
 
     const convertToLines = async () => {
       try {
-        console.log('[DEBUG] StaticChatContent: Starting line conversion');
-        console.log('[DEBUG] Raw chat history items:', chatHistory.length);
+        // console.log('[DEBUG] StaticChatContent: Starting line conversion');
+        // console.log('[DEBUG] Raw chat history items:', chatHistory.length);
         
         // Filter out system messages without content
         const filteredChatHistory = chatHistory.filter(
           (item) => item.message.role !== "system" || item.message.content,
         );
 
-        console.log('[DEBUG] Filtered chat history items:', filteredChatHistory.length);
-        console.log('[DEBUG] Terminal columns:', columns);
+        // console.log('[DEBUG] Filtered chat history items:', filteredChatHistory.length);
+        // console.log('[DEBUG] Terminal columns:', columns);
 
         const lines = await splitChatHistoryIntoLines(filteredChatHistory, columns);
         
-        console.log('[DEBUG] Total line-based items created:', lines.length);
+        // console.log('[DEBUG] Total line-based items created:', lines.length);
         
         if (!isCancelled) {
           setLineChatHistory(lines);

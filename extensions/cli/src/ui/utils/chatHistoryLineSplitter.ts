@@ -1,7 +1,7 @@
 import { render, Text, Box } from 'ink';
 import React from 'react';
 import type { ChatHistoryItem } from '../../../../../core/index.js';
-import { MarkdownRenderer } from '../MarkdownRenderer.js';
+import { MemoizedMessage } from '../components/MemoizedMessage.js';
 import { AnsiParsingStream, StyledLine, StyledSegment } from './AnsiParsingStream.js';
 
 /**
@@ -20,26 +20,26 @@ export interface ChatHistoryLine extends Omit<ChatHistoryItem, 'message'> {
 /**
  * Creates a React component that renders the content invisibly to capture ANSI output
  */
-function createInvisibleRenderer(content: string, terminalWidth: number) {
-  console.log(`[DEBUG] createInvisibleRenderer: content="${content.slice(0, 100)}...", width=${terminalWidth}`);
+function createInvisibleRenderer(item: ChatHistoryItem, index: number, terminalWidth: number) {
+  // console.log(`[DEBUG] createInvisibleRenderer: item role=${item.message.role}, content="${typeof item.message.content === 'string' ? item.message.content.slice(0, 50) : 'non-string'}...", width=${terminalWidth}, toolCalls=${item.toolCallStates?.length || 0}`);
   
   return React.createElement(Box, { width: terminalWidth, flexDirection: 'column' },
-    React.createElement(MarkdownRenderer, { content })
+    React.createElement(MemoizedMessage, { item, index })
   );
 }
 
 /**
  * Renders content to an invisible ANSI stream to extract styling information
  */
-async function renderToAnsiStream(content: string, terminalWidth: number): Promise<StyledLine[]> {
+async function renderToAnsiStream(item: ChatHistoryItem, index: number, terminalWidth: number): Promise<StyledLine[]> {
   const ansiStream = new AnsiParsingStream();
   
   // Create the component to render
-  const component = createInvisibleRenderer(content, terminalWidth);
+  const component = createInvisibleRenderer(item, index, terminalWidth);
   
   return new Promise((resolve, reject) => {
     try {
-      console.log(`[DEBUG] renderToAnsiStream: Rendering content with width ${terminalWidth}`);
+      // console.log(`[DEBUG] renderToAnsiStream: Rendering content with width ${terminalWidth}`);
       
       // Force color support for invisible rendering
       const originalForceColor = process.env.FORCE_COLOR;
@@ -68,10 +68,10 @@ async function renderToAnsiStream(content: string, terminalWidth: number): Promi
           }
           
           // Check what raw data was captured
-          console.log('[DEBUG] Raw ANSI stream data:', JSON.stringify((ansiStream as any).rawOutput || 'No raw output captured'));
+          // console.log('[DEBUG] Raw ANSI stream data:', JSON.stringify((ansiStream as any).rawOutput || 'No raw output captured'));
           
           const lines = ansiStream.getFormattedLines();
-          console.log(`[DEBUG] Parsed ${lines.length} lines from ANSI stream`);
+          // console.log(`[DEBUG] Parsed ${lines.length} lines from ANSI stream`);
           
           ansiStream.reset(); // Clean up for next use
           resolve(lines);
@@ -103,16 +103,16 @@ export async function splitChatHistoryItemIntoLines(
     : JSON.stringify(item.message.content);
 
   try {
-    console.log(`[DEBUG] Processing message ${originalIndex}:`, JSON.stringify(contentStr.slice(0, 100)));
+    // console.log(`[DEBUG] Processing message ${originalIndex}:`, JSON.stringify(contentStr.slice(0, 100)));
     
-    // Render content to invisible ANSI stream to get styling information
-    const styledLines = await renderToAnsiStream(contentStr, terminalWidth - 4); // Account for padding/border
+    // Render complete item (including tool calls) to invisible ANSI stream to get styling information
+    const styledLines = await renderToAnsiStream(item, originalIndex, terminalWidth - 4); // Account for padding/border
     
-    console.log(`[DEBUG] Rendered to ${styledLines.length} styled lines:`, styledLines.map(l => ({
-      line: l.line,
-      segments: l.segments.length,
-      content: l.segments.map(s => s.text).join('')
-    })));
+    // console.log(`[DEBUG] Rendered to ${styledLines.length} styled lines:`, styledLines.map(l => ({
+    //   line: l.line,
+    //   segments: l.segments.length,
+    //   content: l.segments.map(s => s.text).join('')
+    // })));
     
     // Convert styled lines to ChatHistoryLine items
     const result: ChatHistoryLine[] = [];
@@ -123,15 +123,15 @@ export async function splitChatHistoryItemIntoLines(
       // Reconstruct the text content from segments
       const lineContent = styledLine.segments.map(seg => seg.text).join('');
       
-      // Skip empty lines and lines with only cursor control codes
-      if (!lineContent.trim() || /^\x1B\[\?25[lh]/.test(lineContent)) {
+      // Only skip lines with cursor control codes, preserve blank lines for spacing
+      if (/^\x1B\[\?25[lh]/.test(lineContent)) {
         continue;
       }
       
-      console.log(`[DEBUG] Line ${lineIndex}: "${lineContent}" with ${styledLine.segments.length} segments`);
-      styledLine.segments.forEach((seg, i) => {
-        console.log(`  Segment ${i}: "${seg.text}" style:`, seg.style);
-      });
+      // console.log(`[DEBUG] Line ${lineIndex}: "${lineContent}" with ${styledLine.segments.length} segments`);
+      // styledLine.segments.forEach((seg, i) => {
+      //   console.log(`  Segment ${i}: "${seg.text}" style:`, seg.style);
+      // });
       
       result.push({
         ...item,
@@ -147,11 +147,11 @@ export async function splitChatHistoryItemIntoLines(
     
     // If no lines were produced, return empty array - no fallback
     if (result.length === 0) {
-      console.log('[DEBUG] No lines produced, returning empty array');
+      // console.log('[DEBUG] No lines produced, returning empty array');
       return [];
     }
     
-    console.log(`[DEBUG] Final result: ${result.length} line-based items`);
+    // console.log(`[DEBUG] Final result: ${result.length} line-based items`);
     return result;
   } catch (error) {
     console.error('Failed to split chat history item into lines:', error);

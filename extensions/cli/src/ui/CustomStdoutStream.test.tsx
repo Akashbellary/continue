@@ -1,6 +1,6 @@
-import React from 'react';
-import { render, Text, Box } from 'ink';
-import { Writable } from 'stream';
+import { Box, render, Text } from "ink";
+import React from "react";
+import { Writable } from "stream";
 
 class AnsiParsingStream extends Writable {
   segments: Array<{
@@ -21,7 +21,7 @@ class AnsiParsingStream extends Writable {
 
   currentPosition = { row: 0, col: 0 };
   currentStyle = this.getDefaultStyle();
-  rawOutput = '';
+  rawOutput = "";
 
   constructor(options = {}) {
     super(options);
@@ -36,11 +36,15 @@ class AnsiParsingStream extends Writable {
       underline: false,
       strikethrough: false,
       dim: false,
-      inverse: false
+      inverse: false,
     };
   }
 
-  _write(chunk: Buffer, _encoding: string, callback: (error?: Error | null) => void) {
+  _write(
+    chunk: Buffer,
+    _encoding: string,
+    callback: (error?: Error | null) => void,
+  ) {
     const data = chunk.toString();
     this.rawOutput += data;
     this.parseAnsiSequences(data);
@@ -70,54 +74,63 @@ class AnsiParsingStream extends Writable {
 
   addTextSegment(text: string) {
     if (!text) return;
-    
-    let currentText = '';
+
+    let currentText = "";
     let currentCol = this.currentPosition.col;
     let currentRow = this.currentPosition.row;
-    
+
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
-      
-      if (char === '\n') {
+
+      if (char === "\n") {
         if (currentText.length > 0) {
           this.segments.push({
             text: currentText,
             position: { row: currentRow, col: currentCol },
-            endPosition: { row: currentRow, col: currentCol + currentText.length - 1 },
-            style: { ...this.currentStyle }
+            endPosition: {
+              row: currentRow,
+              col: currentCol + currentText.length - 1,
+            },
+            style: { ...this.currentStyle },
           });
-          currentText = '';
+          currentText = "";
         }
-        
+
         currentRow++;
         currentCol = 0;
-      } else if (char === '\r') {
+      } else if (char === "\r") {
         if (currentText.length > 0) {
           this.segments.push({
             text: currentText,
             position: { row: currentRow, col: currentCol },
-            endPosition: { row: currentRow, col: currentCol + currentText.length - 1 },
-            style: { ...this.currentStyle }
+            endPosition: {
+              row: currentRow,
+              col: currentCol + currentText.length - 1,
+            },
+            style: { ...this.currentStyle },
           });
-          currentText = '';
+          currentText = "";
         }
-        
+
         currentCol = 0;
       } else {
         currentText += char;
       }
     }
-    
+
     if (currentText.length > 0) {
       this.segments.push({
         text: currentText,
         position: { row: currentRow, col: currentCol },
-        endPosition: { row: currentRow, col: currentCol + currentText.length - 1 },
-        style: { ...this.currentStyle }
+        endPosition: {
+          row: currentRow,
+          col: currentCol + currentText.length - 1,
+        },
+        style: { ...this.currentStyle },
       });
       currentCol += currentText.length;
     }
-    
+
     this.currentPosition.row = currentRow;
     this.currentPosition.col = currentCol;
   }
@@ -126,17 +139,17 @@ class AnsiParsingStream extends Writable {
     const code = sequence.slice(2, -1);
     const command = sequence.slice(-1);
 
-    if (command === 'm') {
+    if (command === "m") {
       this.processSGR(code);
     }
   }
 
   processSGR(code: string) {
-    const codes = code ? code.split(';').map(Number) : [0];
-    
+    const codes = code ? code.split(";").map(Number) : [0];
+
     for (let i = 0; i < codes.length; i++) {
       const num = codes[i];
-      
+
       switch (num) {
         case 0:
           this.currentStyle = this.getDefaultStyle();
@@ -183,27 +196,33 @@ class AnsiParsingStream extends Writable {
 
   getColorName(colorIndex: number): string {
     const colors = [
-      'black', 'red', 'green', 'yellow',
-      'blue', 'magenta', 'cyan', 'white'
+      "black",
+      "red",
+      "green",
+      "yellow",
+      "blue",
+      "magenta",
+      "cyan",
+      "white",
     ];
     return colors[colorIndex] || `color-${colorIndex}`;
   }
 
   getFormattedLines() {
     const lines = new Map<number, typeof this.segments>();
-    
-    this.segments.forEach(segment => {
+
+    this.segments.forEach((segment) => {
       const row = segment.position.row;
       if (!lines.has(row)) {
         lines.set(row, []);
       }
       lines.get(row)!.push(segment);
     });
-    
+
     lines.forEach((segments) => {
       segments.sort((a, b) => a.position.col - b.position.col);
     });
-    
+
     const result: Array<{
       line: number;
       segments: Array<{
@@ -213,21 +232,21 @@ class AnsiParsingStream extends Writable {
         style: typeof this.currentStyle;
       }>;
     }> = [];
-    
+
     const sortedLines = Array.from(lines.entries()).sort(([a], [b]) => a - b);
-    
+
     sortedLines.forEach(([lineNum, segments]) => {
       result.push({
         line: lineNum,
-        segments: segments.map(segment => ({
+        segments: segments.map((segment) => ({
           text: segment.text,
           startCol: segment.position.col,
           endCol: segment.endPosition.col,
-          style: segment.style
-        }))
+          style: segment.style,
+        })),
       });
     });
-    
+
     return result;
   }
 }
@@ -242,95 +261,104 @@ const TestComponent: React.FC = () => (
     </Box>
     <Box>
       <Text>Normal </Text>
-      <Text color="blue" underline>blue underlined</Text>
+      <Text color="blue" underline>
+        blue underlined
+      </Text>
       <Text> text</Text>
     </Box>
   </Box>
 );
 
-describe('AnsiParsingStream', () => {
-  test('should render React component without ANSI codes in test environment', async () => {
+describe("AnsiParsingStream", () => {
+  test("should render React component without ANSI codes in test environment", async () => {
     const ansiStream = new AnsiParsingStream();
-    
+
     // Force color support
-    process.env.FORCE_COLOR = '1';
-    
+    process.env.FORCE_COLOR = "1";
+
     // Render the component to our custom stream
-    const { unmount } = render(<TestComponent />, { 
-      stdout: ansiStream as any 
+    const { unmount } = render(<TestComponent />, {
+      stdout: ansiStream as any,
     });
-    
+
     // Wait for rendering to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     unmount();
-    
+
     const lines = ansiStream.getFormattedLines();
-    
+
     // In test environment, Ink renders plain text without ANSI codes
     expect(lines.length).toBe(2);
-    
+
     // First line should have text content (but no styling in test mode)
     const firstLine = lines[0];
     expect(firstLine.segments.length).toBe(1);
-    expect(firstLine.segments[0].text).toBe('Bold strikethrough red background');
-    
-    // Second line 
+    expect(firstLine.segments[0].text).toBe(
+      "Bold strikethrough red background",
+    );
+
+    // Second line
     const secondLine = lines[1];
     expect(secondLine.segments.length).toBe(1);
-    expect(secondLine.segments[0].text).toBe('Normal blue underlined text');
+    expect(secondLine.segments[0].text).toBe("Normal blue underlined text");
   });
 
-  test('should maintain proper column positions for multiple segments', async () => {
+  test("should maintain proper column positions for multiple segments", async () => {
     const ansiStream = new AnsiParsingStream();
-    
-    const { unmount } = render(<TestComponent />, { 
-      stdout: ansiStream as any 
+
+    const { unmount } = render(<TestComponent />, {
+      stdout: ansiStream as any,
     });
-    
-    await new Promise(resolve => setTimeout(resolve, 100));
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
     unmount();
-    
+
     const lines = ansiStream.getFormattedLines();
     const firstLine = lines[0];
-    
+
     // Verify segments don't overlap and are in correct order
     for (let i = 1; i < firstLine.segments.length; i++) {
       const prevSegment = firstLine.segments[i - 1];
       const currentSegment = firstLine.segments[i];
-      
-      expect(currentSegment.startCol).toBeGreaterThanOrEqual(prevSegment.endCol + 1);
+
+      expect(currentSegment.startCol).toBeGreaterThanOrEqual(
+        prevSegment.endCol + 1,
+      );
     }
   });
 
-  test('should parse ANSI codes correctly when written directly', () => {
+  test("should parse ANSI codes correctly when written directly", () => {
     const ansiStream = new AnsiParsingStream();
-    
+
     // Write ANSI codes directly
-    const testData = '\x1b[1mBold\x1b[22m \x1b[9mStrikethrough\x1b[29m \x1b[41mRed BG\x1b[49m';
+    const testData =
+      "\x1b[1mBold\x1b[22m \x1b[9mStrikethrough\x1b[29m \x1b[41mRed BG\x1b[49m";
     ansiStream.write(testData);
-    
+
     const lines = ansiStream.getFormattedLines();
-    
+
     expect(lines.length).toBe(1);
     const segments = lines[0].segments;
-    
+
     // Should have multiple segments with different styles
     expect(segments.length).toBeGreaterThan(1);
-    
+
     // Check for bold segment
-    const boldSegment = segments.find(s => s.style.bold);
+    const boldSegment = segments.find((s) => s.style.bold);
     expect(boldSegment).toBeDefined();
-    expect(boldSegment?.text).toBe('Bold');
-    
+    expect(boldSegment?.text).toBe("Bold");
+
     // Check for strikethrough segment
-    const strikethroughSegment = segments.find(s => s.style.strikethrough);
+    const strikethroughSegment = segments.find((s) => s.style.strikethrough);
     expect(strikethroughSegment).toBeDefined();
-    expect(strikethroughSegment?.text).toBe('Strikethrough');
-    
+    expect(strikethroughSegment?.text).toBe("Strikethrough");
+
     // Check for red background segment
-    const redBgSegment = segments.find(s => s.style.backgroundColor === 'red');
+    const redBgSegment = segments.find(
+      (s) => s.style.backgroundColor === "red",
+    );
     expect(redBgSegment).toBeDefined();
-    expect(redBgSegment?.text).toBe('Red BG');
+    expect(redBgSegment?.text).toBe("Red BG");
   });
 });

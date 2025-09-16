@@ -1,8 +1,6 @@
 import { Box, Text } from "ink";
 import React, { memo } from "react";
 
-import { ToolCallTitle } from "src/tools/ToolCallTitle.js";
-import { ToolResultSummary } from "../ToolResultSummary.js";
 import type { ChatHistoryLine } from "../utils/chatHistoryLineSplitter.js";
 import { createStyledTextFromSegments } from "../utils/chatHistoryLineSplitter.js";
 
@@ -17,7 +15,7 @@ export const LineBasedMessage = memo<LineBasedMessageProps>(
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
 
-    console.log(`[DEBUG] LineBasedMessage ${index}: originalIndex=${item.originalIndex}, lineIndex=${item.lineIndex}, content="${message.content.slice(0, 50)}...", segments=${styledSegments?.length || 0}`);
+    // console.log(`[DEBUG] LineBasedMessage ${index}: originalIndex=${item.originalIndex}, lineIndex=${item.lineIndex}, content="${message.content.slice(0, 50)}...", segments=${styledSegments?.length || 0}`);
 
     // Handle system messages
     if (isSystem) {
@@ -35,24 +33,24 @@ export const LineBasedMessage = memo<LineBasedMessageProps>(
       );
     }
 
-    // Handle regular messages
+    // Handle regular messages - let ANSI stream provide all formatting
+    // Add spacing before:
+    // 1. First line of each new original message
+    // 2. Lines that start with ● (new sections within same message, like tool calls)
+    const shouldAddSpacing =
+      (item.lineIndex === 0 && item.originalIndex > 0) ||
+      (item.lineIndex > 0 && message.content.trim().startsWith('●'));
+
     return (
-      <Box key={index} marginBottom={item.lineIndex === 0 ? 1 : 0}>
-        {/* Only show bullet point for first line of each message */}
-        {item.lineIndex === 0 && (
-          <>
-            <Text color={isUser ? "blue" : "white"}>●</Text>
-            <Text> </Text>
-          </>
-        )}
-        {/* Indent continuation lines */}
-        {item.lineIndex > 0 && <Text>  </Text>}
-        
+      <Box key={index} marginTop={shouldAddSpacing ? 1 : 0}>
         {/* DEBUG: Add X prefix to every other line */}
-        {index % 2 === 1 && <Text color="red">X </Text>}
-        
-        {/* Render content with styling if available */}
-        {styledSegments && styledSegments.length > 0 ? (
+        {/* {index % 2 === 1 && <Text color="red">X </Text>} */}
+
+        {/* Render content with styling if available - all formatting comes from ANSI stream */}
+        {message.content.trim() === '' ? (
+          // Render blank lines as empty space
+          <Text> </Text>
+        ) : styledSegments && styledSegments.length > 0 ? (
           // Use ANSI-parsed styling information
           <Box>
             {createStyledTextFromSegments(styledSegments)}
@@ -70,7 +68,7 @@ export const LineBasedMessage = memo<LineBasedMessageProps>(
     // Custom comparison for performance
     const prevMessage = prevProps.item.message;
     const nextMessage = nextProps.item.message;
-    
+
     return (
       prevMessage.content === nextMessage.content &&
       prevMessage.role === nextMessage.role &&
