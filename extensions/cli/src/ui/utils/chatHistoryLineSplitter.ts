@@ -21,7 +21,18 @@ export interface ChatHistoryLine extends Omit<ChatHistoryItem, 'message'> {
  * Creates a React component that renders the content invisibly to capture ANSI output
  */
 function createInvisibleRenderer(item: ChatHistoryItem, index: number, terminalWidth: number) {
-  // console.log(`[DEBUG] createInvisibleRenderer: item role=${item.message.role}, content="${typeof item.message.content === 'string' ? item.message.content.slice(0, 50) : 'non-string'}...", width=${terminalWidth}, toolCalls=${item.toolCallStates?.length || 0}`);
+  // Debug tool output content to see if we have diff data
+  if (item.toolCallStates?.length) {
+    item.toolCallStates.forEach((toolState, i) => {
+      const output = toolState.output?.map(o => o.content).join('\n') || '';
+      console.log(`[DEBUG] Tool ${i} (${toolState.toolCall.function.name}) output length:`, output.length);
+      console.log(`[DEBUG] Tool ${i} contains "Diff:":`, output.includes('Diff:\n'));
+      if (output.includes('Diff:\n')) {
+        const diffSection = output.split('Diff:\n')[1];
+        console.log(`[DEBUG] Diff section preview:`, diffSection?.slice(0, 200));
+      }
+    });
+  }
   
   return React.createElement(Box, { width: terminalWidth, flexDirection: 'column' },
     React.createElement(MemoizedMessage, { item, index })
@@ -68,10 +79,15 @@ async function renderToAnsiStream(item: ChatHistoryItem, index: number, terminal
           }
           
           // Check what raw data was captured
-          // console.log('[DEBUG] Raw ANSI stream data:', JSON.stringify((ansiStream as any).rawOutput || 'No raw output captured'));
+          console.log('[DEBUG] Raw ANSI stream data:', JSON.stringify((ansiStream as any).rawOutput || 'No raw output captured'));
           
           const lines = ansiStream.getFormattedLines();
-          // console.log(`[DEBUG] Parsed ${lines.length} lines from ANSI stream`);
+          console.log(`[DEBUG] Parsed ${lines.length} lines from ANSI stream`);
+          console.log('[DEBUG] Sample lines:', lines.slice(0, 3).map(l => ({
+            line: l.line,
+            content: l.segments.map(s => s.text).join(''),
+            segments: l.segments.length
+          })));
           
           ansiStream.reset(); // Clean up for next use
           resolve(lines);
