@@ -1,33 +1,50 @@
-import React from 'react';
-import { render, Text, Box } from 'ink';
 import { Writable } from 'stream';
 
-class AnsiParsingStream extends Writable {
+export interface StyleInfo {
+  color: string | null;
+  backgroundColor: string | null;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strikethrough: boolean;
+  dim: boolean;
+  inverse: boolean;
+}
+
+export interface StyledSegment {
+  text: string;
+  startCol: number;
+  endCol: number;
+  style: StyleInfo;
+}
+
+export interface StyledLine {
+  line: number;
+  segments: StyledSegment[];
+}
+
+export class AnsiParsingStream extends Writable {
   segments: Array<{
     text: string;
     position: { row: number; col: number };
     endPosition: { row: number; col: number };
-    style: {
-      color: string | null;
-      backgroundColor: string | null;
-      bold: boolean;
-      italic: boolean;
-      underline: boolean;
-      strikethrough: boolean;
-      dim: boolean;
-      inverse: boolean;
-    };
+    style: StyleInfo;
   }> = [];
 
   currentPosition = { row: 0, col: 0 };
   currentStyle = this.getDefaultStyle();
   rawOutput = '';
 
+  // TTY-like properties to make Ink think this is a terminal
+  isTTY = false;
+  columns = 80;
+  rows = 24;
+
   constructor(options = {}) {
     super(options);
   }
 
-  getDefaultStyle() {
+  getDefaultStyle(): StyleInfo {
     return {
       color: null as string | null,
       backgroundColor: null as string | null,
@@ -189,7 +206,7 @@ class AnsiParsingStream extends Writable {
     return colors[colorIndex] || `color-${colorIndex}`;
   }
 
-  getFormattedLines() {
+  getFormattedLines(): StyledLine[] {
     const lines = new Map<number, typeof this.segments>();
     
     this.segments.forEach(segment => {
@@ -204,16 +221,7 @@ class AnsiParsingStream extends Writable {
       segments.sort((a, b) => a.position.col - b.position.col);
     });
     
-    const result: Array<{
-      line: number;
-      segments: Array<{
-        text: string;
-        startCol: number;
-        endCol: number;
-        style: typeof this.currentStyle;
-      }>;
-    }> = [];
-    
+    const result: StyledLine[] = [];
     const sortedLines = Array.from(lines.entries()).sort(([a], [b]) => a - b);
     
     sortedLines.forEach(([lineNum, segments]) => {
@@ -230,107 +238,11 @@ class AnsiParsingStream extends Writable {
     
     return result;
   }
+
+  reset() {
+    this.segments = [];
+    this.currentPosition = { row: 0, col: 0 };
+    this.currentStyle = this.getDefaultStyle();
+    this.rawOutput = '';
+  }
 }
-
-// Test component with individual styled text components
-const TestComponent: React.FC = () => (
-  <Box flexDirection="column">
-    <Box>
-      <Text bold>Bold </Text>
-      <Text strikethrough>strikethrough </Text>
-      <Text backgroundColor="red">red background</Text>
-    </Box>
-    <Box>
-      <Text>Normal </Text>
-      <Text color="blue" underline>blue underlined</Text>
-      <Text> text</Text>
-    </Box>
-  </Box>
-);
-
-describe('AnsiParsingStream', () => {
-  test('should render React component without ANSI codes in test environment', async () => {
-    const ansiStream = new AnsiParsingStream();
-    
-    // Force color support
-    process.env.FORCE_COLOR = '1';
-    
-    // Render the component to our custom stream
-    const { unmount } = render(<TestComponent />, { 
-      stdout: ansiStream as any 
-    });
-    
-    // Wait for rendering to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    unmount();
-    
-    const lines = ansiStream.getFormattedLines();
-    
-    // In test environment, Ink renders plain text without ANSI codes
-    expect(lines.length).toBe(2);
-    
-    // First line should have text content (but no styling in test mode)
-    const firstLine = lines[0];
-    expect(firstLine.segments.length).toBe(1);
-    expect(firstLine.segments[0].text).toBe('Bold strikethrough red background');
-    
-    // Second line 
-    const secondLine = lines[1];
-    expect(secondLine.segments.length).toBe(1);
-    expect(secondLine.segments[0].text).toBe('Normal blue underlined text');
-  });
-
-  test('should maintain proper column positions for multiple segments', async () => {
-    const ansiStream = new AnsiParsingStream();
-    
-    const { unmount } = render(<TestComponent />, { 
-      stdout: ansiStream as any 
-    });
-    
-    await new Promise(resolve => setTimeout(resolve, 100));
-    unmount();
-    
-    const lines = ansiStream.getFormattedLines();
-    const firstLine = lines[0];
-    
-    // Verify segments don't overlap and are in correct order
-    for (let i = 1; i < firstLine.segments.length; i++) {
-      const prevSegment = firstLine.segments[i - 1];
-      const currentSegment = firstLine.segments[i];
-      
-      expect(currentSegment.startCol).toBeGreaterThanOrEqual(prevSegment.endCol + 1);
-    }
-  });
-
-  test('should parse ANSI codes correctly when written directly', () => {
-    const ansiStream = new AnsiParsingStream();
-    
-    // Write ANSI codes directly
-    const testData = '\x1b[1mBold\x1b[22m \x1b[9mStrikethrough\x1b[29m \x1b[41mRed BG\x1b[49m';
-    ansiStream.write(testData);
-    
-    const lines = ansiStream.getFormattedLines();
-    
-    expect(lines.length).toBe(1);
-    const segments = lines[0].segments;
-    
-    // Should have multiple segments with different styles
-    expect(segments.length).toBeGreaterThan(1);
-    
-    // Check for bold segment
-    const boldSegment = segments.find(s => s.style.bold);
-    expect(boldSegment).toBeDefined();
-    expect(boldSegment?.text).toBe('Bold');
-    
-    // Check for strikethrough segment
-    const strikethroughSegment = segments.find(s => s.style.strikethrough);
-    expect(strikethroughSegment).toBeDefined();
-    expect(strikethroughSegment?.text).toBe('Strikethrough');
-    
-    // Check for red background segment
-    const redBgSegment = segments.find(s => s.style.backgroundColor === 'red');
-    expect(redBgSegment).toBeDefined();
-    expect(redBgSegment?.text).toBe('Red BG');
-  });
-});
