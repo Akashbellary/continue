@@ -194,8 +194,14 @@ export class AnsiParsingStream extends Writable {
         default:
           if (num >= 30 && num <= 37) {
             this.currentStyle.color = this.getColorName(num - 30);
+          } else if (num >= 90 && num <= 97) {
+            // Bright colors (90-97)
+            this.currentStyle.color = this.getBrightColorName(num - 90);
           } else if (num >= 40 && num <= 47) {
             this.currentStyle.backgroundColor = this.getColorName(num - 40);
+          } else if (num >= 100 && num <= 107) {
+            // Bright background colors (100-107)
+            this.currentStyle.backgroundColor = this.getBrightColorName(num - 100);
           } else if (num === 38) {
             // Extended foreground color
             const colorInfo = this.parseExtendedColor(codes, i);
@@ -254,6 +260,16 @@ export class AnsiParsingStream extends Writable {
       'blue', 'magenta', 'cyan', 'white'
     ];
     return colors[colorIndex] || `color-${colorIndex}`;
+  }
+
+  getBrightColorName(colorIndex: number): string {
+    const brightColors = [
+      'blackBright', 'redBright', 'greenBright', 'yellowBright',
+      'blueBright', 'magentaBright', 'cyanBright', 'whiteBright'
+    ];
+    // For gray (bright black), use 'gray' which Ink recognizes
+    if (colorIndex === 0) return 'gray';
+    return brightColors[colorIndex] || `brightColor-${colorIndex}`;
   }
 
   getFormattedLines(): StyledLine[] {

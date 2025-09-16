@@ -66,7 +66,7 @@ async function renderToAnsiStream(item: ChatHistoryItem, index: number, terminal
         stdout: ansiStream as any 
       });
       
-      // Wait for rendering to complete, then parse results
+      // Wait longer for complex rendering to complete (tool outputs can be large)
       setTimeout(() => {
         try {
           unmount();
@@ -79,7 +79,10 @@ async function renderToAnsiStream(item: ChatHistoryItem, index: number, terminal
           }
           
           // Check what raw data was captured
-          console.log('[DEBUG] Raw ANSI stream data:', JSON.stringify((ansiStream as any).rawOutput || 'No raw output captured'));
+          const rawOutput = (ansiStream as any).rawOutput || '';
+          console.log('[DEBUG] Raw ANSI stream data length:', rawOutput.length);
+          console.log('[DEBUG] Raw ANSI stream preview:', JSON.stringify(rawOutput.slice(0, 200)));
+          console.log('[DEBUG] Raw ANSI stream end:', JSON.stringify(rawOutput.slice(-200)));
           
           const lines = ansiStream.getFormattedLines();
           console.log(`[DEBUG] Parsed ${lines.length} lines from ANSI stream`);
@@ -94,7 +97,7 @@ async function renderToAnsiStream(item: ChatHistoryItem, index: number, terminal
         } catch (error) {
           reject(error);
         }
-      }, 50); // Small delay to ensure rendering is complete
+      }, 200); // Longer delay for complex tool outputs with diffs
     } catch (error) {
       reject(error);
     }

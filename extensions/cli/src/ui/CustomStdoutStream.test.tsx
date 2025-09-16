@@ -190,8 +190,14 @@ class AnsiParsingStream extends Writable {
         default:
           if (num >= 30 && num <= 37) {
             this.currentStyle.color = this.getColorName(num - 30);
+          } else if (num >= 90 && num <= 97) {
+            // Bright colors (90-97)
+            this.currentStyle.color = this.getBrightColorName(num - 90);
           } else if (num >= 40 && num <= 47) {
             this.currentStyle.backgroundColor = this.getColorName(num - 40);
+          } else if (num >= 100 && num <= 107) {
+            // Bright background colors (100-107)
+            this.currentStyle.backgroundColor = this.getBrightColorName(num - 100);
           } else if (num === 38) {
             // Extended foreground color
             const colorInfo = this.parseExtendedColor(codes, i);
@@ -242,6 +248,16 @@ class AnsiParsingStream extends Writable {
     }
     
     return null;
+  }
+
+  getBrightColorName(colorIndex: number): string {
+    const brightColors = [
+      'blackBright', 'redBright', 'greenBright', 'yellowBright',
+      'blueBright', 'magentaBright', 'cyanBright', 'whiteBright'
+    ];
+    // For gray (bright black), use 'gray' which Ink recognizes
+    if (colorIndex === 0) return 'gray';
+    return brightColors[colorIndex] || `brightColor-${colorIndex}`;
   }
 
   getColorName(colorIndex: number): string {
@@ -466,5 +482,38 @@ describe("AnsiParsingStream", () => {
     
     expect(redBgSegment).toBeDefined();
     expect(greenBgSegment).toBeDefined();
+  });
+
+  test('should parse bright colors like gray correctly', () => {
+    const ansiStream = new AnsiParsingStream();
+    
+    // Test bright colors including gray (90)
+    const testData = '\x1b[34m●\x1b[39m \x1b[90mGray text\x1b[39m \x1b[91mBright red\x1b[39m';
+    ansiStream.write(testData);
+    
+    const lines = ansiStream.getFormattedLines();
+    
+    console.log('Bright color test segments:', lines[0].segments.map(s => ({
+      text: s.text,
+      color: s.style.color
+    })));
+    
+    expect(lines.length).toBe(1);
+    const segments = lines[0].segments;
+    
+    // Check for blue bullet
+    const blueSegment = segments.find(s => s.style.color === 'blue');
+    expect(blueSegment).toBeDefined();
+    expect(blueSegment?.text).toBe('●');
+    
+    // Check for gray text
+    const graySegment = segments.find(s => s.style.color === 'gray');
+    expect(graySegment).toBeDefined();
+    expect(graySegment?.text).toBe('Gray text');
+    
+    // Check for bright red
+    const brightRedSegment = segments.find(s => s.style.color === 'redBright');
+    expect(brightRedSegment).toBeDefined();
+    expect(brightRedSegment?.text).toBe('Bright red');
   });
 });
